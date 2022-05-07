@@ -24,5 +24,5 @@ jobs:
       run: |
           mkdir artifacts
           go build -o artifacts/osmviews-builder -ldflags="-s -w -X main.SoftwareVersion=OSMViews/${{github.ref_name}}" -v ./cmd/osmviews-builder
-          go build -o artifacts/webserver -ldflags="-s -w" -v ./cmd/webserver
+          go build -o artifacts/webserver -ldflags="-s -w -X main.ServerVersion=OSMViews/${{github.ref_name}}" -v ./cmd/webserver
           ls -l artifacts

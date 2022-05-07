@@ -17,6 +17,13 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
+// ServerVersion is returned to HTTP clients as the Server header.
+// In released server binaries, the value of this variable is
+// overwritten to a string that includes the tagged release version,
+// for example "OSMViews/0.7". The release process does this by passing
+// the -X flag to the Go compiler/linker.
+var ServerVersion = "OSMViews"
+
 func main() {
 	port := flag.Int("port", 0, "port for serving HTTP requests")
 	storagekey := flag.String("storage-key", "keys/storage-key", "path to key with storage access credentials")
@@ -53,6 +60,9 @@ type Webserver struct {
 }
 
 func (ws *Webserver) HandleMain(w http.ResponseWriter, r *http.Request) {
+	h := w.Header()
+	h.Set("Server", ServerVersion)
+
 	fmt.Fprintf(w, "%s",
 		`<html>
 <head>
@@ -111,6 +121,8 @@ func (ws *Webserver) HandleDownload(w http.ResponseWriter, req *http.Request) {
 	defer c.Close()
 
 	h := w.Header()
+	h.Set("Server", ServerVersion)
+
 	switch req.Method {
 	case http.MethodGet:
 		// As per https://tools.ietf.org/html/rfc7232, ETag must have quotes.
@@ -139,7 +151,10 @@ func (ws *Webserver) HandleDownload(w http.ResponseWriter, req *http.Request) {
 // didn't handle /robots.txt ourselves, Wikimedia's proxy would inject
 // a deny-all response and return that to the caller.
 func (ws *Webserver) HandleRobotsTxt(w http.ResponseWriter, r *http.Request) {
+	h := w.Header()
+	h.Set("Server", ServerVersion)
+
 	// https://wikitech.wikimedia.org/wiki/Help:Toolforge/Web#/robots.txt
-	w.Header().Set("Content-Type", "text/plain")
+	h.Set("Content-Type", "text/plain")
 	fmt.Fprintf(w, "%s", "User-Agent: *\nAllow: /\n")
 }
