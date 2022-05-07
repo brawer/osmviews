@@ -1,12 +1,12 @@
 # SPDX-FileCopyrightText: 2022 Sascha Brawer <sascha@brawer.ch>
 # SPDX-Licence-Identifier: MIT
 
-name: Test, build, and deploy
+name: Build, test, and release
 
 on: [push, pull_request]
 
 jobs:
-  test-build-deploy:
+  test-build-release:
     runs-on: ubuntu-latest
     steps:
     - name: Check out source code
@@ -19,8 +19,10 @@ jobs:
       run: go build -ldflags="-s -w" -v ./...
     - name: Test
       run: go test -v ./...
-    - name: Deploy
+    - name: Release
       # if: startsWith(github.ref, 'refs/tags')
       run: |
           go build -o osmviews-builder -ldflags="-s -w -X main.SoftwareVersion=OSMViews/${{github.ref_name}}" -v ./cmd/osmviews-builder
-          file osmviews-builder
+          go build -o webserver -ldflags="-s -w" -v ./cmd/webserver
+          file osmviews-builder webserver
+          hub --version
