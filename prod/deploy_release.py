@@ -50,7 +50,9 @@ def download_release(tag):
 
 def restart_webserver(path):
     binary = (path / 'webserver').resolve()
-    cmd = ['webserver', '--backend=kubernetes', 'golang',
+    # As of May 2022, Toolforge Kubernetes has no 'generic' webserver,
+	# so we pretend to use the latest supported version of Go.
+    cmd = ['webservice', '--backend=kubernetes', 'golang111',
            'restart', str(binary)]
     print(' '.join(cmd))
 
