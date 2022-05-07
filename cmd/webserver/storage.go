@@ -66,7 +66,7 @@ func NewStorage(keypath, workdir string) (*Storage, error) {
 		return nil, err
 	}
 
-	client.SetAppInfo("QRankWebserver", "0.1")
+	client.SetAppInfo("osmviews-webserver", "0.1")
 	return &Storage{
 		client:  client,
 		workdir: workdir,
@@ -80,7 +80,7 @@ var objRegexp = regexp.MustCompile(`public/([a-z\-]+)\-(2[0-9]{7})\.([a-z0-9\.]+
 // Any old content (which is not live anymore) is deleted from local disk.
 func (s *Storage) Reload(ctx context.Context) error {
 	// Find the most recent version of each file in storage.
-	objects := s.client.ListObjects(ctx, "qrank", minio.ListObjectsOptions{
+	objects := s.client.ListObjects(ctx, "osmviews", minio.ListObjectsOptions{
 		Prefix:    "public/",
 		Recursive: false,
 	})
@@ -106,7 +106,7 @@ func (s *Storage) Reload(ctx context.Context) error {
 		}
 		if _, err := os.Stat(path); err != nil {
 			tmpPath := path + ".tmp"
-			if err := s.client.FGetObject(ctx, "qrank", obj.Key, tmpPath, minio.GetObjectOptions{}); err != nil {
+			if err := s.client.FGetObject(ctx, "osmviews", obj.Key, tmpPath, minio.GetObjectOptions{}); err != nil {
 				return err
 			}
 			if err := os.Chtimes(tmpPath, time.Now(), obj.LastModified); err != nil {
