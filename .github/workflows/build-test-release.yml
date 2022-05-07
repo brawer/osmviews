@@ -17,7 +17,7 @@ jobs:
         go-version: 1.18
     - name: Build
       run: |
-          go build -o artifacts/osmviews-builder -ldflags="-s -w -X main.SoftwareVersion=OSMViews/${{github.ref_name}}" -v ./cmd/osmviews-builder
+          go build -o artifacts/builder -ldflags="-s -w -X main.SoftwareVersion=OSMViews/${{github.ref_name}}" -v ./cmd/osmviews-builder
           go build -o artifacts/webserver -ldflags="-s -w -X main.ServerVersion=OSMViews/${{github.ref_name}}" -v ./cmd/webserver
     - name: Test
       run: go test -v ./...
