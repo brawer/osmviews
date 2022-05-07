@@ -25,4 +25,4 @@ jobs:
           go build -ldflags="-s -w" -v ./...
           ls
           pwd
-		  file osmviews-builder
+          file osmviews-builder
