@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2022 Sascha Brawer <sascha@brawer.ch>
 // SPDX-License-Identifier: MIT
 
-module github.com/brawer/wikidata-qrank/v2
+module github.com/brawer/osmviews/v2
 
 go 1.17
 
