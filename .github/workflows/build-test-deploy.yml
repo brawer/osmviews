@@ -25,4 +25,5 @@ jobs:
           go build -ldflags="-s -w" -v ./...
           ls
           pwd
+          printenv
           file osmviews-builder
