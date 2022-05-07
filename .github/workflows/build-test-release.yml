@@ -24,7 +24,7 @@ jobs:
     - name: Release
       if: startsWith(github.ref, 'refs/tags')
       uses: actions/upload-artifact@v3
-	  with:
+      with:
         name: osmviews
         path: artifacts/
         if-no-files-found: error
