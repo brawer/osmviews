@@ -15,6 +15,12 @@ import (
 	"strings"
 )
 
+// Name of the producing software to embed in output TIFF files.
+// When a release is cut, our replease script passes a flag to
+// the Go compiler which overwrites this string with a software
+// name that also contains the release tag, like "OSMViews/0.7.3".
+var SoftwareVersion = "OSMViews"
+
 type Raster struct {
 	tile        TileKey
 	parent      *Raster
@@ -476,7 +482,10 @@ func (w *RasterWriter) writeIFD(zoom uint8, f *os.File) error {
 			}
 
 		case software:
-			s := []byte("TileRank\u0000")
+			var softwareBuf bytes.Buffer
+			softwareBuf.WriteString(SoftwareVersion)
+			softwareBuf.WriteByte(0)
+			s := softwareBuf.Bytes()
 			typ, count, value = asciiFormat, uint32(len(s)), uint32(extraPos)+uint32(extraBuf.Len())
 			extraBuf.Write(s)
 

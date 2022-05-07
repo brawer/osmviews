@@ -29,6 +29,7 @@ func main() {
 	}
 	defer logfile.Close()
 	logger = log.New(logfile, "", log.Ldate|log.Ltime|log.LUTC|log.Lshortfile)
+	logger.Println("SoftwareVersion:", SoftwareVersion)
 
 	var storage Storage
 	if *storagekey != "" {
