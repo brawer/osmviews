@@ -138,7 +138,7 @@ func (s *fakeStorageClient) ListObjects(ctx context.Context, bucketName string, 
 }
 
 func (s *fakeStorageClient) FGetObject(ctx context.Context, bucketName, objectName, filePath string, opts minio.GetObjectOptions) error {
-	if bucketName == "qrank" && objectName == "public/hello-20211229.txt" {
+	if bucketName == "osmviews" && objectName == "public/hello-20211229.txt" {
 		return os.WriteFile(filePath, []byte("Hello"), 0644)
 	} else {
 		return fmt.Errorf("object not found: %s/%s", bucketName, objectName)

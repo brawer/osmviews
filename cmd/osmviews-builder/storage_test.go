@@ -31,7 +31,7 @@ func TestCleanup(t *testing.T) {
 		"public/osmviews-not-matching-pattern.txt",
 		"public/qrank-20210830.csv.gz",
 	} {
-		if err := s.PutFile(ctx, "qrank", path, localpath, "text/plain"); err != nil {
+		if err := s.PutFile(ctx, "osmviews", path, localpath, "text/plain"); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -41,7 +41,7 @@ func TestCleanup(t *testing.T) {
 			{"public/osmviews-stats-%s.json", "application/json"},
 		} {
 			path := fmt.Sprintf(p.pattern, date)
-			if err := s.PutFile(ctx, "qrank", path, localpath, p.contentType); err != nil {
+			if err := s.PutFile(ctx, "osmviews", path, localpath, p.contentType); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -52,7 +52,7 @@ func TestCleanup(t *testing.T) {
 				break
 			}
 			path := fmt.Sprintf("internal/osmviews-builder/tilelogs-%d-W%02d.br", year, week)
-			if err := s.PutFile(ctx, "qrank", path, localpath, "application/x-brotli"); err != nil {
+			if err := s.PutFile(ctx, "osmviews", path, localpath, "application/x-brotli"); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -62,7 +62,7 @@ func TestCleanup(t *testing.T) {
 	}
 
 	got := make([]string, 0)
-	files, err := s.List(ctx, "qrank", "public/")
+	files, err := s.List(ctx, "osmviews", "public/")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -157,7 +157,7 @@ type FakeStorage struct {
 }
 
 func (s *FakeStorage) BucketExists(ctx context.Context, bucket string) (bool, error) {
-	return bucket == "qrank", nil
+	return bucket == "osmviews", nil
 }
 
 func (s *FakeStorage) PutFile(ctx context.Context, bucket string, remotepath string, localpath string, contentType string) error {
