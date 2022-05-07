@@ -23,8 +23,4 @@ jobs:
       run: go test -v ./...
     - name: Release
       if: startsWith(github.ref, 'refs/tags')
-      uses: actions/upload-artifact@v3
-      with:
-        name: osmviews
-        path: artifacts/
-        if-no-files-found: error
+      run: hub release create -m "osmviews-${{github.ref_name}}" -a artifacts/osmviews-builder -a artifacts/webserver
