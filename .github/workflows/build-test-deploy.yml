@@ -20,4 +20,7 @@ jobs:
       run: go build -ldflags="-s -w" -v ./cmd/...
     - name: Deploy
       # if: startsWith(github.ref, 'refs/tags')
-      run: echo ${{github.ref}} `ls -l`
+      run: |
+          echo ${{github.ref}} ${{github.ref_name}}
+          ls
+          pwd
