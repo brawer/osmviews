@@ -37,12 +37,12 @@ func main() {
 		if err != nil {
 			logger.Fatal(err)
 		}
-		bucketExists, err := storage.BucketExists(ctx, "qrank")
+		bucketExists, err := storage.BucketExists(ctx, "osmviews")
 		if err != nil {
 			logger.Fatal(err)
 		}
 		if !bucketExists {
-			logger.Fatal("storage bucket \"qrank\" does not exist")
+			logger.Fatal("storage bucket \"osmviews\" does not exist")
 		}
 	}
 
@@ -62,7 +62,7 @@ func main() {
 	}
 	lastDay := weekStart(year, week).AddDate(0, 0, 6)
 	date := lastDay.Format("20060102")
-	bucket := "qrank"
+	bucket := "osmviews"
 	localpath := filepath.Join(*cachedir, fmt.Sprintf("osmviews-%s.tiff", date))
 	localStatsPath := filepath.Join(*cachedir, fmt.Sprintf("osmviews-stats-%s.json", date))
 	localStatsPlotPath := filepath.Join(*cachedir, fmt.Sprintf("osmviews-statsplot-%s.png", date))
