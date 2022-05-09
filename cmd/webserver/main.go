@@ -67,26 +67,65 @@ func (ws *Webserver) HandleMain(w http.ResponseWriter, r *http.Request) {
 		`<html>
 <head>
 <link href='https://tools-static.wmflabs.org/fontcdn/css?family=Roboto+Slab:400,700' rel='stylesheet' type='text/css'/>
+<link href='https://tools-static.wmflabs.org/fontcdn/css?family=Source+Code+Pro:400' rel='stylesheet' type='text/css'/>
 <style>
 * {
   font-family: 'Roboto Slab', serif;
 }
 h1 {
-  color: #0066ff;
+  color: #ad1027;
   margin-left: 1em;
   margin-top: 1em;
 }
-p {
-  margin-left: 5em;
+.osm { color: #dd5a0b }
+p { margin-left: 5em }
+p.code {
+  margin-left: 9em;
+  display: block;
+  white-space: pre;
+  font-family: 'Source Code Pro', monospace;
 }
+a { color: #bc6e64 }
+a:active { color: #711d2f }
+a:visited { color: #e1aead }
 </style>
 </head>
-<body><h1>OSMViews</h1>
+<body><h1><span class="osm">OSM</span>Views</h1>
 
-<p>Ranking geo locations based on OpenStreetMap views.
-Useful for maintaining Wikidata and other data that needs
-to order or prioritize geographic locations. For background, see
-<a href="https://github.com/brawer/osmviews">source repo</a>.</p>
+<p>World-wide ranking of geographic locations based on OpenStreetMap tile logs.
+<br/>Updated weekly. Aggregated over the past 12 months to smoothen seasonal effects.
+<br/>Works for any location on the planet at ~100m resolution.</p>
+
+<p><b>Usage in Python:</b></p>
+
+<p class="code"># pip install osmviews
+import osmviews
+with osmviews.OSMViews('path/to/osmviews.tiff') as o:
+    print(f'Tokyo, Shibuya:      {o.rank( 35.658514, 139.701330):>9.2f}')
+    print(f'Tokyo, Sumida:       {o.rank( 35.710719, 139.801547):>9.2f}')
+    print(f'Zürich, Altstetten:  {o.rank( 47.391485,   8.488945):>9.2f}')
+    print(f'Zürich, Witikon:     {o.rank( 47.358651,   8.590251):>9.2f}')
+    print(f'Ushuaia, Costa Este: {o.rank(-54.794395, -68.251958):>9.2f}')
+    print(f'Ushuaia, Las Reinas: {o.rank(-54.769225, -68.279174):>9.2f}')
+
+Tokyo, Shibuya:      227437.98
+Tokyo, Sumida:        60537.62
+Zürich, Altstetten:   37883.31
+Zürich, Witikon:      11711.94
+Ushuaia, Costa Este:   2697.14
+Ushuaia, Las Reinas:    257.89
+</pre>
+
+<p>
+<b>Author:</b> <a href="https://brawer.ch/">Sascha Brawer</a>
+<br/><b>Backend:</b>
+<a href="https://github.com/brawer/osmviews">github.com/brawer/osmviews</a>
+<br/><b>Clients:</b>
+<a href="https://github.com/brawer/osmviews-py">Python</a>
+<br/><b>Download:</b> <a href="download/osmviews.tiff">Cloud-Optimized GeoTIFF</a> (data),
+<a href="download/osmviews-stats.json">JSON</a> (histogram)
+<br/><b>License:</b> <a href="https://creativecommons.org/publicdomain/zero/1.0/">CC0-1.0</a> (data), <a href="https://en.wikipedia.org/wiki/MIT_License">MIT</a> (code)
+</p>
 
 <p><img src="https://mirrors.creativecommons.org/presskit/buttons/88x31/svg/cc-zero.svg"
 width="88" height="31" alt="Public Domain" style="float:left"/></p>
