@@ -73,11 +73,11 @@ func (ws *Webserver) HandleMain(w http.ResponseWriter, r *http.Request) {
   font-family: 'Roboto Slab', serif;
 }
 h1 {
-  color: #ad1027;
+  color: #ffaed7;
   margin-left: 1em;
   margin-top: 1em;
 }
-.osm { color: #dd5a0b }
+.osm { color: #ff0088 }
 p { margin-left: 5em }
 p.code {
   margin-left: 9em;
@@ -85,18 +85,19 @@ p.code {
   white-space: pre;
   font-family: 'Source Code Pro', monospace;
 }
-a { color: #bc6e64 }
-a:active { color: #711d2f }
-a:visited { color: #e1aead }
+a:link { color: #ff77bb }
+a:hover { color: #ff48a5 }
+a:active { color: #ff0088 }
+a:visited { color: #ffaed7 }
 </style>
 </head>
 <body><h1><span class="osm">OSM</span>Views</h1>
 
 <p>World-wide ranking of geographic locations based on OpenStreetMap tile logs.
 <br/>Updated weekly. Aggregated over the past 52 weeks to smoothen seasonal effects.
-<br/>Works for any location on the planet at up to ~150m/z18 resolution.</p>
+<br/>For any location on the planet, up to ~150m/z18 resolution.</p>
 
-<p><b>Usage in Python:</b></p>
+<p><b>Use in Python:</b></p>
 
 <p class="code"># pip install osmviews
 import osmviews
