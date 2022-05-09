@@ -164,7 +164,7 @@ func (ws *Webserver) HandleDownload(w http.ResponseWriter, req *http.Request) {
 
 	case http.MethodOptions: // CORS pre-flight
 		h.Set("Allow", "GET, HEAD, OPTIONS")
-		h.Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+		h.Set("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS")
 		h.Set("Access-Control-Allow-Headers", "ETag, If-Match, If-None-Match, If-Modified-Since, If-Range, Range")
 		h.Set("Access-Control-Allow-Origin", "*")
 		h.Set("Access-Control-Expose-Headers", "ETag")
@@ -172,7 +172,7 @@ func (ws *Webserver) HandleDownload(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 
 	default:
-		h.Set("Allow", "GET, OPTIONS")
+		h.Set("Allow", "GET, HEAD, OPTIONS")
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	}
 }
