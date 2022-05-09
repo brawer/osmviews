@@ -8,7 +8,7 @@
 # $ ssh bastion.toolforge.org
 # $ become osmviews
 # $ python3 prod/deploy_release.py                      # deploy latest version
-# $ python3 prod/deploy_release.py --release_tag=0.0.3  # specific version
+# $ python3 prod/deploy_release.py --release_tag=0.0.2  # specific version
 
 
 import argparse
@@ -74,6 +74,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='Deploy OSMViews release to production')
     parser.add_argument('--release_tag', default='latest', required=False,
-                        help="release tag such as "0.0.1", or 'latest'")
+                        help="release tag such as '0.0.2', or 'latest'")
     args = parser.parse_args()
     deploy_release(args.release_tag)
