@@ -3,19 +3,23 @@ SPDX-FileCopyrightText: 2022 Sascha Brawer <sascha@brawer.ch>
 SPDX-License-Identifier: MIT
 -->
 
-# OSMViews Builder
+# Builder
 
-The `osmviews-builder` tool is a cronjob that computes `osmviews.tiff`
+The `builder` tool is a cronjob that computes `osmviews.tiff`
 and `osmviews-stats.json` from OpenStreetMap tile log impressions.
 
 
 ## Release instructions
 
-We should set up an automatic release process, but are blocked on
-[T194332](https://phabricator.wikimedia.org/T194332). Meanwhile,
-here’s how to manually push a new version of the binary to production.
-(Wikimedia wants to run production binaries from NFS, ouch).
+We should set up a fully automatic release process, but are blocked on
+[Wikimedia T194332](https://phabricator.wikimedia.org/T194332). Currently,
+a GitHub action automatically builds and tests a release candidate
+whenever a git tag gets pushed to the repository. However, to become
+live, the binary still needs to be deployed to production. Note that
+this will update both the backend pipeline and the web server.
 
 ```bash
-$ GOOS=linux go build ./cmd/osmviews-builder && scp ./osmviews-builder sascha@bastion.toolforge.org:/data/project/qrank/bin/osmviews-builder
+$ ssh bastion.toolforge.org
+$ become osmviews
+$ python3 prod/deploy_release.py latest  # either 'latest' or tag like '0.0.2'
 ```
