@@ -60,9 +60,9 @@ def restart_webserver(path):
 
 
 def start_builder(path):
-    run_command([
+    run_command([  # run daily at 15:59 UTC
         'toolforge-jobs', 'run', 'builder', '--command', str(path/'builder'),
-         '--image', 'tf-bullseye-std', '--schedule', '* * * * *'])
+         '--image', 'tf-bullseye-std', '--schedule', '59 15 * * *'])
 
 
 def run_command(cmd):
