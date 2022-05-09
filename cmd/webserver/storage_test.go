@@ -147,8 +147,7 @@ func (s *fakeStorageClient) FGetObject(ctx context.Context, bucketName, objectNa
 
 func TestStorage_objRegexp(t *testing.T) {
 	for _, s := range []string{
-		"public/qrank-20220631.csv.gz",
-		"public/qrank-stats-20220631.json",
+		"public/osmviews-stats-20220631.json",
 		"public/osmviews-20220631.tiff",
 	} {
 		if !objRegexp.MatchString(s) {
@@ -158,7 +157,7 @@ func TestStorage_objRegexp(t *testing.T) {
 
 	for _, s := range []string{
 		"internal/osmviews-builder/foobar.tiff",
-		"public/qrank.csv.gz",
+		"public/foobar.csv.gz",
 	} {
 		if objRegexp.MatchString(s) {
 			t.Errorf("should not match but does: %v", s)

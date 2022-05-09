@@ -91,8 +91,8 @@ func GetTileLogs(week string, client *http.Client, workdir string, storage Stora
 
 	remotePath := fmt.Sprintf("internal/osmviews-builder/tilelogs-%s.br", week)
 	if storage != nil {
-		if _, err := storage.Stat(ctx, "qrank", remotePath); err == nil {
-			if r, err := storage.Get(ctx, "qrank", remotePath); err == nil {
+		if _, err := storage.Stat(ctx, "osmviews", remotePath); err == nil {
+			if r, err := storage.Get(ctx, "osmviews", remotePath); err == nil {
 				return brotli.NewReader(r), nil
 			}
 		}
@@ -182,7 +182,7 @@ func GetTileLogs(week string, client *http.Client, workdir string, storage Stora
 	// Upload the file to object storage and return a reader for it.
 	if storage != nil {
 		contentType := "application/x-brotli"
-		if err := storage.PutFile(ctx, "qrank", remotePath, path, contentType); err != nil {
+		if err := storage.PutFile(ctx, "osmviews", remotePath, path, contentType); err != nil {
 			return nil, err
 		}
 
@@ -190,7 +190,7 @@ func GetTileLogs(week string, client *http.Client, workdir string, storage Stora
 			return nil, err
 		}
 
-		if r, err := storage.Get(ctx, "qrank", remotePath); err == nil {
+		if r, err := storage.Get(ctx, "osmviews", remotePath); err == nil {
 			return brotli.NewReader(r), nil
 		}
 	}

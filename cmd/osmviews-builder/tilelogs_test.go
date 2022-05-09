@@ -194,7 +194,7 @@ func TestGetTileLogs(t *testing.T) {
 
 	ctx := context.Background()
 	remotePath := "internal/osmviews-builder/tilelogs-2567-W12.br"
-	stat, err := s.Stat(ctx, "qrank", remotePath)
+	stat, err := s.Stat(ctx, "osmviews", remotePath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -207,7 +207,7 @@ func TestGetTileLogs(t *testing.T) {
 func TestGetTileLogsCached(t *testing.T) {
 	ctx := context.Background()
 	s := NewFakeStorage()
-	if err := s.PutFile(ctx, "qrank", "internal/osmviews-builder/tilelogs-2042-W08.br", "testdata/tilelogs-2042-W08.br", "application/x-brotli"); err != nil {
+	if err := s.PutFile(ctx, "osmviews", "internal/osmviews-builder/tilelogs-2042-W08.br", "testdata/tilelogs-2042-W08.br", "application/x-brotli"); err != nil {
 		t.Fatal(err)
 	}
 	reader, err := GetTileLogs("2042-W08", nil, "", s)

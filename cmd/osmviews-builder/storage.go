@@ -108,7 +108,7 @@ func Cleanup(s Storage) error {
 		{"public/osmviews-", `public/osmviews-\d{8}\.tiff`, 3},
 		{"public/osmviews-stats-", `public/osmviews-stats-\d{8}\.json`, 3},
 	} {
-		if err := cleanupPath("qrank", p.prefix, p.pattern, p.keep, s); err != nil {
+		if err := cleanupPath("osmviews", p.prefix, p.pattern, p.keep, s); err != nil {
 			return err
 		}
 	}

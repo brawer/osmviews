@@ -29,7 +29,7 @@ func TestCleanup(t *testing.T) {
 	for _, path := range []string{
 		"internal/otherproject’s_data_should/not/be/touched.txt",
 		"public/osmviews-not-matching-pattern.txt",
-		"public/qrank-20210830.csv.gz",
+		"public/quxfoo-20210830.csv.gz",
 	} {
 		if err := s.PutFile(ctx, "osmviews", path, localpath, "text/plain"); err != nil {
 			t.Fatal(err)
@@ -140,7 +140,7 @@ func TestCleanup(t *testing.T) {
 		"public/osmviews-stats-20211226.json",
 		"public/osmviews-stats-20220102.json",
 		"public/osmviews-stats-20220109.json",
-		"public/qrank-20210830.csv.gz",
+		"public/quxfoo-20210830.csv.gz",
 	}
 	if strings.Join(got, "|") != strings.Join(want, "|") {
 		t.Errorf("got %v, want %v", got, want)
