@@ -2,24 +2,29 @@
 # SPDX-FileCopyrightText: 2022 Sascha Brawer <sascha@brawer.ch>
 # SPDX-License-Identifier: MIT
 #
-# Script for deploying a release on Wikimedia Toolforge.
-#
-# Usage:
+# Script for deploying a release to production. Needs to be run
+# on Wikimedia Toolforge, not your local machine. Usage:
 #
 # $ ssh bastion.toolforge.org
 # $ become osmviews
-# $ python3 prod/deploy_release.py
+# $ python3 prod/deploy_release.py                      # deploy latest version
+# $ python3 prod/deploy_release.py --release_tag=0.0.3  # specific version
 
+
+import argparse
 import json
 import os
 import pathlib
 import shutil
+import subprocess
 import urllib.request
 
 
-def deploy_release(tag='latest'):
+def deploy_release(tag):
     path = download_release(tag)
+    run_command(['toolforge-jobs', 'flush'])  # stop all cronjobs
     restart_webserver(path)
+    start_builder(path)
 
 
 def download_release(tag):
@@ -50,12 +55,25 @@ def download_release(tag):
 
 def restart_webserver(path):
     binary = (path / 'webserver').resolve()
-    # As of May 2022, Toolforge Kubernetes has no 'generic' webserver,
-	# so we pretend to use the latest supported version of Go.
-    cmd = ['webservice', '--backend=kubernetes', 'golang111',
-           'restart', str(binary)]
+    run_command(['webservice', '--backend=gridengine', 'generic',
+                 'restart', str(path / 'webserver')])
+
+
+def start_builder(path):
+    run_command([
+        'toolforge-jobs', 'run', 'builder', '--command', str(path/'builder'),
+         '--image', 'tf-bullseye-std', '--schedule', '* * * * *'])
+
+
+def run_command(cmd):
     print(' '.join(cmd))
+    subprocess.run(cmd, check=True)
 
 
 if __name__ == '__main__':
-    deploy_release(tag='latest')
+    parser = argparse.ArgumentParser(
+        description='Deploy OSMViews release to production')
+    parser.add_argument('--release_tag', default='latest', required=False,
+                        help="release tag such as "0.0.1", or 'latest'")
+    args = parser.parse_args()
+    deploy_release(args.release_tag)
