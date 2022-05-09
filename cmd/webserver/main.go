@@ -93,8 +93,8 @@ a:visited { color: #e1aead }
 <body><h1><span class="osm">OSM</span>Views</h1>
 
 <p>World-wide ranking of geographic locations based on OpenStreetMap tile logs.
-<br/>Updated weekly. Aggregated over the past 12 months to smoothen seasonal effects.
-<br/>Works for any location on the planet at ~100m resolution.</p>
+<br/>Updated weekly. Aggregated over the past 52 weeks to smoothen seasonal effects.
+<br/>Works for any location on the planet at up to ~150m/z18 resolution.</p>
 
 <p><b>Usage in Python:</b></p>
 
