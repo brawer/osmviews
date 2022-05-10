@@ -68,12 +68,13 @@ func (ws *Webserver) HandleMain(w http.ResponseWriter, r *http.Request) {
 <head>
 <link href='https://tools-static.wmflabs.org/fontcdn/css?family=Roboto+Slab:400,700' rel='stylesheet' type='text/css'/>
 <link href='https://tools-static.wmflabs.org/fontcdn/css?family=Source+Code+Pro:400' rel='stylesheet' type='text/css'/>
+<meta name='viewport' content='width=device-width, initial-scale=1.0'>
 <style>
 * {
+  box-sizing: border-box;
   font-family: 'Roboto Slab', serif;
 }
 h1 {
-  color: #ffaed7;
   margin-left: 1em;
   margin-top: 1em;
 }
@@ -101,7 +102,8 @@ a:visited { color: #ffaed7 }
 
 <p class="code"># pip install osmviews
 import osmviews
-with osmviews.OSMViews('path/to/osmviews.tiff') as o:
+osmviews.download('/tmp/osmviews.tiff')
+with osmviews.open('/tmp/osmviews.tiff') as o:
     print(f'Tokyo, Shibuya:      {o.rank( 35.658514, 139.701330):>9.2f}')
     print(f'Tokyo, Sumida:       {o.rank( 35.710719, 139.801547):>9.2f}')
     print(f'Zürich, Altstetten:  {o.rank( 47.391485,   8.488945):>9.2f}')

@@ -5,11 +5,16 @@ Updated weekly. Aggregated over the past 52 weeks to smoothen seasonal effects.
 For any location on the planet, up to ~150m/z18 resolution.
 
 
-## Roadmap to 1.0
+## Code repository
 
-* Write a Python function `osmviews.load()` to load and refresh
-  the local GeoTIFF file. Currently, clients have to download the
-  the file manually.
+* `cmd/webserver` is the [OSMViews webserver](https://osmviews.toolforge.org).
+* `cmd/osmviews-builder` is the pipeline that computes the data.
+
+Client libraries are maintained in separate repositories.
+For Python, see [brawer/osmviews-py](https://github.com/brawer/osmviews-py).
+
+
+## Roadmap to 1.0
 
 * Write documentation for the Python client.
 
