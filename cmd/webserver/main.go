@@ -64,7 +64,8 @@ func (ws *Webserver) HandleMain(w http.ResponseWriter, r *http.Request) {
 	h.Set("Server", ServerVersion)
 
 	fmt.Fprintf(w, "%s",
-		`<html>
+		`<!DOCTYPE html>
+<html>
 <head>
 <link href='https://tools-static.wmflabs.org/fontcdn/css?family=Roboto+Slab:400,700' rel='stylesheet' type='text/css'/>
 <link href='https://tools-static.wmflabs.org/fontcdn/css?family=Source+Code+Pro:400' rel='stylesheet' type='text/css'/>
