@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html>
+  <!-- Draft for web app, not yet used in production -->
+  <!-- SPDX-FileCopyrightText: 2022 Sascha Brawer (sascha@brawer.ch) -->
+  <!-- SPDX-License-Identifier: MIT -->
+  <header>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.8.0/dist/leaflet.css" integrity="sha512-hoalWLoI8r4UszCkZ5kL8vayOGVae1oxXe/2A4AO6J9+580uKHDO3JdHb7NzwwzK5xr/Fs0W40kiNHxM9vyTtQ==" crossorigin=""/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.8.0/dist/leaflet.css"
+   integrity="sha512-hoalWLoI8r4UszCkZ5kL8vayOGVae1oxXe/2A4AO6J9+580uKHDO3JdHb7NzwwzK5xr/Fs0W40kiNHxM9vyTtQ=="
+   crossorigin=""/>
+   <style>
+
+* {
+  box-sizing: border-box;
+  font-family: system-ui, sans;
+}
+
+html, body { height: 100%; margin: 0; }
+	  
+body {
+	    display: flex;
+		flex-direction: column;
+}
+
+	  h1 { margin: 4px 20px; }
+
+      .header { background-color: #f06; height: 50px; color:#fff}
+	  .map { flex-grow: 1;}
+
+.histogram-control-box {
+  position: absolute;
+  right: 50px;
+  bottom: 10px;
+  width: 150px;
+  height: 64px;
+  border: 1px solid rgb(0,0,0,0.2);
+  border-radius: 4px;
+  z-index: 800;
+}
+
+#histogram {
+  font-size: 16px;
+  z-index: 800;
+  width: 100%;
+  height: 100%;
+  background-color: #fff;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.attribution {
+  font-size: 12px;
+  position: absolute;
+  right: 12px;
+  bottom: 80px;
+  z-index: 999;
+}
+
+	</style>
+    <script src="https://unpkg.com/leaflet@1.8.0/dist/leaflet.js"
+   integrity="sha512-BB3hKbKWOc9Ez/TAwyWxNXeoV9c1v6FIeYiBieIWkpLjauysF18NzgR1MBNBXf8/KABdlkX68nAhlwcDFLGPCQ=="
+     crossorigin=""></script>
+
+    <script async src="https://www.unpkg.com/geotiff@2.0.5/dist-browser/geotiff.js"></script>
+    <script async src="https://www.unpkg.com/plotty@0.4.9/dist/plotty.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.8.0/dist/leaflet.js"
+   integrity="sha512-BB3hKbKWOc9Ez/TAwyWxNXeoV9c1v6FIeYiBieIWkpLjauysF18NzgR1MBNBXf8/KABdlkX68nAhlwcDFLGPCQ=="
+     crossorigin=""></script>
+
+  </header>
+  <script>
+
+let tiff = null;
+let pool = null;
+let map = null;
+let marker = null;
+
+function drawHistogram(data) {
+  const canvas = document.getElementById("histogram");
+  const height = canvas.height - 40;
+  const scaleY = height / Math.log10(data.Samples[0][2]);
+  const lastRank = data.Samples[data.Samples.length - 1][1];
+  const scaleX = (canvas.width - 40) / Math.log10(lastRank);
+
+  const dotVal = 10000;
+  var ctx = canvas.getContext("2d");
+  ctx.lineWidth = 5;
+  ctx.strokeStyle = "#444";
+  ctx.moveTo(20, 20);
+  var dot = null
+  for (const sample of data.Samples) {
+    const val = sample[2]
+    const y = height - Math.max(0, Math.log10(val)) * scaleY;
+    const x = Math.log10(sample[1]) * scaleX;
+	ctx.lineTo(x+20, y+20);
+    if (!dot && sample[2] <= dotVal) {
+      dot = [x, y];
+	}
+  }
+  ctx.stroke();
+
+  if (dot) {
+	ctx.beginPath();
+	ctx.arc(dot[0]+20, dot[1]+20, 12, 0, 2 * Math.PI, false);
+    ctx.fillStyle = '#f06';
+	ctx.fill();
+  }
+
+  console.log(dot);
+}
+
+function onLoad() {
+  fetch('https://osmviews.toolforge.org/download/osmviews-stats.json')
+    .then(response => response.json())
+    .then(data => drawHistogram(data));
+
+    tiff = GeoTIFF.fromUrl(
+        "https://osmviews.toolforge.org/download/osmviews.tiff");
+    pool = new GeoTIFF.Pool();
+    map = L.map('map', {
+	  attributionControl: false,
+	  maxZoom: 11,
+	  minZoom: 1,
+	  zoomControl: false
+	}).setView([0, 0], 2);
+    L.control.zoom({position: 'bottomright'}).addTo(map);
+
+    marker = L.circleMarker([47.2, 8.5], {
+	  radius: 10,
+	  fillColor: "#f06",
+	  fillOpacity: 1,
+	  weight: 0
+	}).addTo(map);
+
+    L.tileLayer('https://a.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png', {
+        tileSize: 256,
+        minZoom: 1,
+        crossOrigin: true
+      }).addTo(map);
+
+    L.GridLayer.CanvasCircles = L.GridLayer.extend({
+      createTile: function (coords) {
+        var tile = document.createElement('canvas');
+        var tileSize = this.getTileSize();
+        tile.setAttribute('width', tileSize.x);
+        tile.setAttribute('height', tileSize.y);
+
+		  
+        var f = (async function(tile) {
+          const tif = await tiff;
+          const image = await tif.getImage(coords.z);
+          const tileData = await image.getTileOrStrip(coords.x, coords.y, 0, pool);
+
+		  /*
+          const plot = new plotty.plot({
+              tile,
+              data: tileData.data,
+              width: image.getTileWidth(),
+              height: image.getTileHeight(),
+              domain: [0, 230000],
+              colorScale: "portland"
+          });
+          plot.render();
+		  */
+
+		});
+		f(tile);
+		//f(tile).then(
+		//  value => done(null, tile),
+		//  error => done(error, tile));
+        //var ctx = tile.getContext('2d');
+        //ctx.beginPath();
+        //ctx.arc(tileSize.x/2, tileSize.x/2, 4 + coords.z*4, 0, 2*Math.PI, false);
+        //ctx.fill();
+		
+	    //setTimeout(function () {
+        //    done(null, tile);	// Syntax is 'done(error, tile)'
+        //}, 500 + Math.random() * 1500);
+
+        return tile;
+    }
+	});
+	L.gridLayer.canvasCircles = function (opts) {
+		return new L.GridLayer.CanvasCircles(opts);
+	};
+	var cavasGridLayer = L.gridLayer.canvasCircles();
+	map.addLayer(cavasGridLayer);
+
+
+}
+
+function foobar() {
+  canvas = document.getElementById("canvas");
+  (async function() {
+    tif = await tiff;
+
+	const image = await tif.getImage(7);
+	const tile = await image.getTileOrStrip(3, 2, 0, pool);
+    const plot = new plotty.plot({
+      canvas,
+      data: tile.data,
+      width: image.getTileWidth(),
+      height: image.getTileHeight(),
+      domain: [0, 230000],
+      colorScale: "portland"
+    });
+	plot.render();
+  })();
+}
+
+  </script>
+  
+  <body onload="onLoad()">
+    <div class="header"><h1>OSMViews</h1></div>
+    <div id="map" class="map"></div>
+    <div id="map">
+	  <div class="histogram-control-box">
+	  	<canvas id="histogram"></canvas>
+      </div>
+	  <div class="attribution">© OpenStreetMap contributors</span>
+    </div>
+  </body>
+</html>
