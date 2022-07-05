@@ -62,7 +62,7 @@ def restart_webserver(path):
 def start_builder(path):
     run_command([  # run daily at 15:59 UTC
         'toolforge-jobs', 'run', 'builder', '--command',
-        '%s --keys=keys/storage-key' % (path/'builder'),
+        '%s --storage-key=keys/storage-key' % (path/'builder'),
          '--image', 'tf-bullseye-std', '--schedule', '59 15 * * *'])
 
 
