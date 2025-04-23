@@ -3,12 +3,9 @@
 
 module github.com/brawer/osmviews/v2
 
-go 1.23.0
+go 1.24.2
 
-toolchain go1.24.2
-
-// +heroku goVersion go1.23
-// +heroku install ./cmd/qrank-builder ./cmd/webserver
+// +heroku install ./cmd/osmviews-builder ./cmd/webserver
 
 require (
 	github.com/andybalholm/brotli v1.1.1
