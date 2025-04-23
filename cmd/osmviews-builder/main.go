@@ -22,12 +22,7 @@ func main() {
 	cachedir := flag.String("cache", "cache/osmviews-builder", "path to cache directory")
 	flag.Parse()
 
-	logfile, err := createLogFile()
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer logfile.Close()
-	logger = log.New(logfile, "", log.Ldate|log.Ltime|log.LUTC|log.Lshortfile)
+	logger = log.New(os.Stderr, "", log.Ldate|log.Ltime|log.LUTC|log.Lshortfile)
 	logger.Println("SoftwareVersion:", SoftwareVersion)
 
 	storage, err := NewStorage()
@@ -112,23 +107,6 @@ func main() {
 			logger.Fatal(err)
 		}
 	}
-}
-
-// Create a file for keeping logs. If the file already exists, its
-// present content is preserved, and new log entries will get appended
-// after the existing ones.
-func createLogFile() (*os.File, error) {
-	logpath := filepath.Join("logs", "osmviews-builder.log")
-	if err := os.MkdirAll("logs", os.ModePerm); err != nil {
-		return nil, err
-	}
-
-	logfile, err := os.OpenFile(logpath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		return nil, err
-	}
-
-	return logfile, nil
 }
 
 // Fetch log data for up to `maxWeeks` weeks from planet.openstreetmap.org.
