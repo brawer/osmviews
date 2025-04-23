@@ -87,7 +87,7 @@ func NewStorage() (Storage, error) {
 		return nil, err
 	}
 
-	client.SetAppInfo("QRankOSMViewsBuilder", "0.1")
+	client.SetAppInfo("OSMViewsBuilder", "0.1")
 	return &remoteStorage{client: client}, nil
 }
 
