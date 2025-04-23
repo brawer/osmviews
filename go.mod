@@ -7,10 +7,7 @@ go 1.23.0
 
 toolchain go1.24.2
 
-// Tell the Heroku Go Buildpack (on Wikimedia Toolforge Build Service)
-// what binaries we want to have installed into the production container.
-//
-// https://github.com/heroku/heroku-buildpack-go?tab=readme-ov-file#go-module-specifics
+// +heroku goVersion go1.23
 // +heroku install ./cmd/qrank-builder ./cmd/webserver
 
 require (
