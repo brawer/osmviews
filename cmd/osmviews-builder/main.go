@@ -20,7 +20,6 @@ func main() {
 	ctx := context.Background()
 
 	cachedir := flag.String("cache", "cache/osmviews-builder", "path to cache directory")
-	storagekey := flag.String("storage-key", "", "path to key with storage access credentials")
 	flag.Parse()
 
 	logfile, err := createLogFile()
@@ -31,19 +30,16 @@ func main() {
 	logger = log.New(logfile, "", log.Ldate|log.Ltime|log.LUTC|log.Lshortfile)
 	logger.Println("SoftwareVersion:", SoftwareVersion)
 
-	var storage Storage
-	if *storagekey != "" {
-		storage, err = NewStorage(*storagekey)
-		if err != nil {
-			logger.Fatal(err)
-		}
-		bucketExists, err := storage.BucketExists(ctx, "osmviews")
-		if err != nil {
-			logger.Fatal(err)
-		}
-		if !bucketExists {
-			logger.Fatal("storage bucket \"osmviews\" does not exist")
-		}
+	storage, err := NewStorage()
+	if err != nil {
+		logger.Fatal(err)
+	}
+	bucketExists, err := storage.BucketExists(ctx, "osmviews")
+	if err != nil {
+		logger.Fatal(err)
+	}
+	if !bucketExists {
+		logger.Fatal("storage bucket \"osmviews\" does not exist")
 	}
 
 	maxWeeks := 52 // 1 year

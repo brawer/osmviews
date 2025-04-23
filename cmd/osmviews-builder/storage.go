@@ -5,7 +5,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -76,19 +75,12 @@ func (s *remoteStorage) Remove(ctx context.Context, bucket, path string) error {
 }
 
 // NewStorage sets up a client for accessing S3-compatible object storage.
-func NewStorage(keypath string) (Storage, error) {
-	data, err := os.ReadFile(keypath)
-	if err != nil {
-		return nil, err
-	}
-
-	var config struct{ Endpoint, Key, Secret string }
-	if err := json.Unmarshal(data, &config); err != nil {
-		return nil, err
-	}
-
-	client, err := minio.New(config.Endpoint, &minio.Options{
-		Creds:  credentials.NewStaticV4(config.Key, config.Secret, ""),
+func NewStorage() (Storage, error) {
+	endpoint := os.Getenv("S3_ENDPOINT")
+	key := os.Getenv("S3_KEY")
+	secret := os.Getenv("S3_SECRET")
+	client, err := minio.New(endpoint, &minio.Options{
+		Creds:  credentials.NewStaticV4(key, secret, ""),
 		Secure: true,
 	})
 	if err != nil {
