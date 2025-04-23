@@ -16,7 +16,7 @@ jobs:
     - name: Install Go
       uses: actions/setup-go@v3
       with:
-        go-version: 1.18
+        go-version: 1.24
     - name: Build
       run: |
           go build -o artifacts/builder -ldflags="-s -w -X main.SoftwareVersion=OSMViews/${{github.ref_name}}" -v ./cmd/osmviews-builder
