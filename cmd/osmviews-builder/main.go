@@ -10,11 +10,8 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"os"
 	"path/filepath"
 )
-
-var logger *log.Logger
 
 func main() {
 	ctx := context.Background()
@@ -22,8 +19,8 @@ func main() {
 	cachedir := flag.String("cache", "cache/osmviews-builder", "path to cache directory")
 	flag.Parse()
 
-	logger = log.New(os.Stderr, "", log.Ldate|log.Ltime|log.LUTC|log.Lshortfile)
-	logger.Println("SoftwareVersion:", SoftwareVersion)
+	logger := log.Default()
+	logger.SetFlags(log.Ldate | log.Ltime | log.LUTC | log.Lshortfile)
 
 	storage, err := NewStorage()
 	if err != nil {
@@ -70,10 +67,7 @@ func main() {
 		hasStats := err == nil
 		if hasGeoTiff && hasStats {
 			msg := fmt.Sprintf("Already in storage: %s/%s and %s/%s", bucket, remotepath, bucket, remoteStatsPath)
-			fmt.Println(msg)
-			if logger != nil {
-				logger.Println(msg)
-			}
+			logger.Println(msg)
 			return
 		}
 	}
@@ -100,7 +94,6 @@ func main() {
 		}
 
 		msg := fmt.Sprintf("Uploaded to storage: %s/%s and %s/%s\n", bucket, remotepath, bucket, remoteStatsPath)
-		fmt.Println(msg)
 		logger.Println(msg)
 
 		if err := Cleanup(storage); err != nil {
@@ -118,6 +111,7 @@ func main() {
 // downloaded before. The result is an array of readers (one for each week),
 // and the ISO week string (like "2021-W28") for the last available week.
 func fetchWeeklyLogs(cachedir string, storage Storage, maxWeeks int) ([]io.Reader, string, error) {
+	logger := log.Default()
 	client := &http.Client{}
 	weeks, err := GetAvailableWeeks(client)
 	if err != nil {
@@ -128,11 +122,9 @@ func fetchWeeklyLogs(cachedir string, storage Storage, maxWeeks int) ([]io.Reade
 		weeks = weeks[len(weeks)-maxWeeks:]
 	}
 
-	if logger != nil {
-		logger.Printf(
-			"found %d weeks with OpenStreetMap tile logs, from %s to %s",
-			len(weeks), weeks[0], weeks[len(weeks)-1])
-	}
+	logger.Printf(
+		"found %d weeks with OpenStreetMap tile logs, from %s to %s",
+		len(weeks), weeks[0], weeks[len(weeks)-1])
 
 	readers := make([]io.Reader, 0, len(weeks))
 	for _, week := range weeks {

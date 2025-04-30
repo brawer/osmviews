@@ -7,7 +7,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"os"
+	"path/filepath"
 	"regexp"
 	"sort"
 
@@ -109,6 +111,7 @@ func Cleanup(s Storage) error {
 
 func cleanupPath(bucket, prefix, pattern string, keep int, s Storage) error {
 	ctx := context.Background()
+	logger := log.Default()
 	re := regexp.MustCompile(pattern)
 
 	found := make([]string, 0, keep+10)
@@ -125,16 +128,49 @@ func cleanupPath(bucket, prefix, pattern string, keep int, s Storage) error {
 	if len(found) > keep {
 		sort.Strings(found)
 		for _, path := range found[0 : len(found)-keep] {
-			msg := fmt.Sprintf("Deleting from storage: %s/%s", bucket, path)
-			fmt.Println(msg)
-			if logger != nil {
-				logger.Println(msg)
-			}
+			logger.Printf("Deleting from storage: %s/%s", bucket, path)
 			if err := s.Remove(ctx, bucket, path); err != nil {
 				return err
 			}
 		}
 	}
 
+	return nil
+}
+
+func Download(s Storage, bucket string, remotePath string, localPath string) error {
+	ctx := context.Background()
+	logger := log.Default()
+	out, err := os.CreateTemp(filepath.Dir(localPath), "*.tmp")
+	if err != nil {
+		return err
+	}
+
+	r, err := s.Get(ctx, bucket, remotePath)
+	errMsg := fmt.Sprintf("download of s3://%s/%s failed", bucket, remotePath)
+	if err != nil {
+		out.Close()
+		os.Remove(out.Name())
+		logger.Printf("%s: %v", errMsg, err)
+		return err
+	}
+
+	if _, err = io.Copy(out, r); err != nil {
+		out.Close()
+		os.Remove(out.Name())
+		logger.Printf("%s: %v", errMsg, err)
+		return err
+	}
+
+	if err = out.Close(); err != nil {
+		os.Remove(out.Name())
+		logger.Printf("%s: %v", errMsg, err)
+		return err
+	}
+
+	if err = os.Rename(out.Name(), localPath); err != nil {
+		os.Remove(out.Name())
+		logger.Printf("%s: %v", errMsg, err)
+	}
 	return nil
 }

@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -88,25 +89,35 @@ var tileLogRegexp = regexp.MustCompile(`^(\d+)/(\d+)/(\d+)\s+(\d+)$`)
 // cachedir.
 func GetTileLogs(week string, client *http.Client, workdir string, storage Storage) (io.Reader, error) {
 	ctx := context.Background()
-
-	remotePath := fmt.Sprintf("internal/osmviews-builder/tilelogs-%s.br", week)
-	if storage != nil {
-		if _, err := storage.Stat(ctx, "osmviews", remotePath); err == nil {
-			if r, err := storage.Get(ctx, "osmviews", remotePath); err == nil {
-				return brotli.NewReader(r), nil
-			}
-		}
-	}
+	logger := log.Default()
 
 	path := filepath.Join(workdir, fmt.Sprintf("tilelogs-%s.br", week))
 	if f, err := os.Open(path); err == nil {
+		logger.Printf("for week %s, reading %s from workdir", week, path)
 		return brotli.NewReader(f), nil
 	}
 
-	if logger != nil {
-		logger.Printf("building %s", path)
+	remotePath := fmt.Sprintf("internal/osmviews-builder/tilelogs-%s.br", week)
+	remotePathExists := false
+	if _, err := storage.Stat(ctx, "osmviews", remotePath); err == nil {
+		remotePathExists = true
 	}
 
+	if remotePathExists {
+		logger.Printf("for week %s, loading s3://osmviews/%s to %s", week, remotePath, path)
+		if err := Download(storage, "osmviews", remotePath, path); err != nil {
+			logger.Printf("cannot download %s to %s, err=%v", remotePath, path, err)
+			return nil, err
+		}
+
+		if f, err := os.Open(path); err == nil {
+			return brotli.NewReader(f), nil
+		} else {
+			return nil, err
+		}
+	}
+
+	logger.Printf("for week %s, computing %s", week, path)
 	if err := os.MkdirAll(workdir, os.ModePerm); err != nil {
 		return nil, err
 	}
@@ -179,20 +190,11 @@ func GetTileLogs(week string, client *http.Client, workdir string, storage Stora
 		return nil, err
 	}
 
-	// Upload the file to object storage and return a reader for it.
-	if storage != nil {
-		contentType := "application/x-brotli"
-		if err := storage.PutFile(ctx, "osmviews", remotePath, path, contentType); err != nil {
-			return nil, err
-		}
-
-		if err := os.Remove(path); err != nil {
-			return nil, err
-		}
-
-		if r, err := storage.Get(ctx, "osmviews", remotePath); err == nil {
-			return brotli.NewReader(r), nil
-		}
+	// Upload the file to object storage.
+	contentType := "application/x-brotli"
+	if err := storage.PutFile(ctx, "osmviews", remotePath, path, contentType); err != nil {
+		logger.Printf("upload of %s to s3://osmviews/%s failed: %v", path, remotePath, err)
+		return nil, err
 	}
 
 	// Open the file for reading and return a reader for it.
