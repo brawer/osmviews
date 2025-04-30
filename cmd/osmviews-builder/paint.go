@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 
 	"golang.org/x/sync/errgroup"
 )
@@ -144,6 +145,9 @@ func NewPainter(path string, numWeeks int, zoom uint8) (*Painter, error) {
 // Paint produces a GeoTIFF file from a set of weekly tile view counts.
 // Tile views at zoom level `zoom` become one pixel in the output GeoTIFF.
 func paint(path string, zoom uint8, tilecounts []io.Reader, ctx context.Context) error {
+	logger := log.Default()
+	logger.Printf("starting to paint GeoTIFF, path=%s, zoom=%d", path, zoom)
+
 	// One goroutine is decompressing, parsing and merging the weekly counts;
 	// another is painting the image from data that gets sent over a channel.
 	ch := make(chan TileCount, 100000)

@@ -147,6 +147,35 @@ func TestCleanup(t *testing.T) {
 	}
 }
 
+func TestDownload(t *testing.T) {
+	remotePath := "remote/path.txt"
+	srcPath := filepath.Join(t.TempDir(), "test_download_src.txt")
+	destPath := filepath.Join(t.TempDir(), "test_download_dest.txt")
+	if err := os.WriteFile(srcPath, []byte("foo"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	s := NewFakeStorage()
+	ctx := context.Background()
+	if err := s.PutFile(ctx, "osmviews", remotePath, srcPath, "text/plain"); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := Download(s, "osmviews", remotePath, destPath); err != nil {
+		t.Fatal(err)
+	}
+
+	gotBytes, err := os.ReadFile(destPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(gotBytes)
+
+	if got != "foo" {
+		t.Errorf("expected \"foo\", got \"%s\"", got)
+	}
+}
+
 type FakeStorageObject struct {
 	Content []byte
 	Info    ObjectInfo

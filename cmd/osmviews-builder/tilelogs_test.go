@@ -11,6 +11,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -78,13 +79,13 @@ func TestGetAvailableWeeksServerError(t *testing.T) {
 
 func TestGetTileLogs(t *testing.T) {
 	client := &http.Client{Transport: &FakeOSMPlanet{}}
-	cachedir, err := ioutil.TempDir("", "tilelogs_test")
+	workdir, err := ioutil.TempDir("", "tilelogs_test")
 	if err != nil {
 		t.Error(err)
 		return
 	}
 	s := NewFakeStorage()
-	reader, err := GetTileLogs("2567-W12", client, cachedir, s)
+	reader, err := GetTileLogs("2567-W12", client, workdir, s)
 	if err != nil {
 		t.Error(err)
 		return
@@ -204,13 +205,18 @@ func TestGetTileLogs(t *testing.T) {
 	}
 }
 
-func TestGetTileLogsCached(t *testing.T) {
+func TestGetTileLogsCachedInStorage(t *testing.T) {
 	ctx := context.Background()
+	workdir, err := ioutil.TempDir("", "tilelogs_test")
+	if err != nil {
+		t.Error(err)
+		return
+	}
 	s := NewFakeStorage()
 	if err := s.PutFile(ctx, "osmviews", "internal/osmviews-builder/tilelogs-2042-W08.br", "testdata/tilelogs-2042-W08.br", "application/x-brotli"); err != nil {
 		t.Fatal(err)
 	}
-	reader, err := GetTileLogs("2042-W08", nil, "", s)
+	reader, err := GetTileLogs("2042-W08", nil, workdir, s)
 	if err != nil {
 		t.Error(err)
 		return
@@ -219,6 +225,27 @@ func TestGetTileLogsCached(t *testing.T) {
 	got := readStream(reader)
 	if got != "Hello world" {
 		t.Errorf(`expected "Hello World", got "%s"`, got)
+	}
+}
+
+func TestGetTileLogsCachedInWorkdir(t *testing.T) {
+	// "foo" after Brotli compression
+	foo_br := []byte{0x0f, 0x01, 0x80, 0x66, 0x6f, 0x6f, 0x03}
+
+	workdir, _ := os.MkdirTemp("", "tilelogs_test")
+	path := filepath.Join(workdir, "tilelogs-2051-W17.br")
+	os.WriteFile(path, foo_br, 0644)
+
+	s := NewFakeStorage()
+	reader, err := GetTileLogs("2051-W17", nil, workdir, s)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	got := readStream(reader)
+	if got != "foo" {
+		t.Errorf(`expected "foo", got "%s"`, got)
 	}
 }
 
