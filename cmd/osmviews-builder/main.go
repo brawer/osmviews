@@ -10,17 +10,24 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"path/filepath"
 )
 
 func main() {
 	ctx := context.Background()
 
-	cachedir := flag.String("cache", "cache/osmviews-builder", "path to cache directory")
+	workdir := flag.String("workdir", "", "path to working directory")
 	flag.Parse()
 
 	logger := log.Default()
 	logger.SetFlags(log.Ldate | log.Ltime | log.LUTC | log.Lshortfile)
+
+	if *workdir != "" {
+		if err := os.MkdirAll(*workdir, 0755); err != nil {
+			logger.Fatal(err)
+		}
+	}
 
 	storage, err := NewStorage()
 	if err != nil {
@@ -35,7 +42,7 @@ func main() {
 	}
 
 	maxWeeks := 52 // 1 year
-	tilecounts, lastWeek, err := fetchWeeklyLogs(*cachedir, storage, maxWeeks)
+	tilecounts, lastWeek, err := fetchWeeklyLogs(*workdir, storage, maxWeeks)
 	if err != nil {
 		logger.Fatal(err)
 	}
@@ -51,9 +58,9 @@ func main() {
 	lastDay := weekStart(year, week).AddDate(0, 0, 6)
 	date := lastDay.Format("20060102")
 	bucket := "osmviews"
-	localpath := filepath.Join(*cachedir, fmt.Sprintf("osmviews-%s.tiff", date))
-	localStatsPath := filepath.Join(*cachedir, fmt.Sprintf("osmviews-stats-%s.json", date))
-	localStatsPlotPath := filepath.Join(*cachedir, fmt.Sprintf("osmviews-statsplot-%s.png", date))
+	localpath := filepath.Join(*workdir, fmt.Sprintf("osmviews-%s.tiff", date))
+	localStatsPath := filepath.Join(*workdir, fmt.Sprintf("osmviews-stats-%s.json", date))
+	localStatsPlotPath := filepath.Join(*workdir, fmt.Sprintf("osmviews-statsplot-%s.png", date))
 	remotepath := fmt.Sprintf("public/osmviews-%s.tiff", date)
 	remoteStatsPath := fmt.Sprintf("public/osmviews-stats-%s.json", date)
 
@@ -110,7 +117,7 @@ func main() {
 // is run periodically, it will only fetch the content that has not been
 // downloaded before. The result is an array of readers (one for each week),
 // and the ISO week string (like "2021-W28") for the last available week.
-func fetchWeeklyLogs(cachedir string, storage Storage, maxWeeks int) ([]io.Reader, string, error) {
+func fetchWeeklyLogs(workdir string, storage Storage, maxWeeks int) ([]io.Reader, string, error) {
 	logger := log.Default()
 	client := &http.Client{}
 	weeks, err := GetAvailableWeeks(client)
@@ -128,7 +135,7 @@ func fetchWeeklyLogs(cachedir string, storage Storage, maxWeeks int) ([]io.Reade
 
 	readers := make([]io.Reader, 0, len(weeks))
 	for _, week := range weeks {
-		if r, err := GetTileLogs(week, client, cachedir, storage); err == nil {
+		if r, err := GetTileLogs(week, client, workdir, storage); err == nil {
 			readers = append(readers, r)
 		} else {
 			return nil, "", err
