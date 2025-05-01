@@ -174,7 +174,17 @@ func (w *RasterWriter) Write(r *Raster) error {
 		return w.WriteUniform(r.tile, color)
 	}
 
-	offset, size, err := w.compress(r.tile, r.pixels[:])
+	// For each pixel, we emit the natural logarithm of 1 plus its
+	// original value. While this logarithmizing does not affect
+	// the relative order of pixels, it produces a nicely
+	// near-linear distributino of absolute values. Tools such as
+	// QGIS can more easily visualize our GeoTIFF image when the pixel
+	// values have a somewhat linear distribution.
+	var logPixels [256 * 256]float32
+	for i := 0; i < 256*256; i++ {
+		logPixels[i] = float32(math.Log1p(float64(r.pixels[i])))
+	}
+	offset, size, err := w.compress(r.tile, logPixels[:])
 	if err != nil {
 		return err
 	}
@@ -199,12 +209,13 @@ func (w *RasterWriter) WriteUniform(tile TileKey, color uint32) error {
 		return nil
 	}
 	col := float32(color)
+	logCol := float32(math.Log1p(float64(color)))
 	if col > w.maxValue {
 		w.maxValue = col
 	}
 	var pixels [256 * 256]float32
 	for i := 0; i < len(pixels); i++ {
-		pixels[i] = col
+		pixels[i] = logCol
 	}
 	offset, size, err := w.compress(tile, pixels[:])
 	if err != nil {
@@ -490,10 +501,14 @@ func (w *RasterWriter) writeIFD(zoom uint8, f *os.File) error {
 			extraBuf.Write(s)
 
 		case sMinSampleValue:
-			typ, count, value = floatFormat, 1, math.Float32bits(0)
+			typ, count = floatFormat, 1
+			logMinSampleValue := math.Log1p(0.0)
+			value = math.Float32bits(float32(logMinSampleValue))
 
 		case sMaxSampleValue:
-			typ, count, value = floatFormat, 1, math.Float32bits(w.maxValue)
+			typ, count = floatFormat, 1
+			logMaxSampleValue := math.Log1p(float64(w.maxValue))
+			value = math.Float32bits(float32(logMaxSampleValue))
 
 		case geoKeyDirectory:
 			typ, count, value = shortFormat, uint32(len(geoKeys)), uint32(extraPos)+uint32(extraBuf.Len())
