@@ -125,8 +125,7 @@ Ushuaia, Las Reinas:    257.89
 <a href="https://github.com/brawer/osmviews">github.com/brawer/osmviews</a>
 <br/><b>Clients:</b>
 <a href="https://github.com/brawer/osmviews-py">Python</a>
-<br/><b>Download:</b> <a href="download/osmviews.tiff">Cloud-Optimized GeoTIFF</a> (data),
-<a href="download/osmviews-stats.json">JSON</a> (histogram)
+<br/><b>Download:</b> <a href="download/osmviews.tiff">Cloud-Optimized GeoTIFF</a>
 <br/><b>License:</b> <a href="https://creativecommons.org/publicdomain/zero/1.0/">CC0-1.0</a> (data), <a href="https://en.wikipedia.org/wiki/MIT_License">MIT</a> (code)
 </p>
 
