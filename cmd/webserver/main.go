@@ -33,6 +33,12 @@ func main() {
 		*port, _ = strconv.Atoi(os.Getenv("PORT"))
 	}
 
+	if *workdir != "" {
+		if err := os.MkdirAll(*workdir, 0755); err != nil {
+			log.Fatal(err)
+		}
+	}
+
 	storage, err := NewStorage(*workdir)
 	if err != nil {
 		log.Fatal(err)
