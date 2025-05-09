@@ -17,7 +17,7 @@ import (
 func main() {
 	ctx := context.Background()
 
-	workdir := flag.String("workdir", "", "path to working directory")
+	workdir := flag.String("workdir", "osmviews-builder-workdir", "path to working directory")
 	flag.Parse()
 
 	logger := log.Default()
