@@ -23,8 +23,3 @@ jobs:
           go build -o artifacts/webserver -ldflags="-s -w -X main.ServerVersion=OSMViews/${{github.ref_name}}" -v ./cmd/webserver
     - name: Test
       run: go test -v ./...
-    - name: Release
-      if: startsWith(github.ref, 'refs/tags')
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: hub release create -m ${{github.ref_name}} -a artifacts/builder -a artifacts/webserver ${{github.ref_name}}
