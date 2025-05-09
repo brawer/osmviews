@@ -9,6 +9,7 @@ For any location on the planet, up to ~150m/z18 resolution.
 
 * `cmd/webserver` is the [OSMViews webserver](https://osmviews.toolforge.org).
 * `cmd/osmviews-builder` is the pipeline that computes the data.
+* `docs` contains [documentation](docs/).
 
 Client libraries are maintained in separate repositories.
 For Python, see [brawer/osmviews-py](https://github.com/brawer/osmviews-py).
