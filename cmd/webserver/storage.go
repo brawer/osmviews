@@ -6,7 +6,6 @@ package main
 import (
 	"context"
 	"encoding/base32"
-	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -43,20 +42,15 @@ type storageClient interface {
 }
 
 // NewStorage sets up a client for accessing S3-compatible object storage.
-func NewStorage(keypath, workdir string) (*Storage, error) {
+func NewStorage(workdir string) (*Storage, error) {
 	if err := os.MkdirAll(workdir, 0755); err != nil {
 		return nil, err
 	}
 
-	data, err := os.ReadFile(keypath)
-	if err != nil {
-		return nil, err
-	}
-
 	var config struct{ Endpoint, Key, Secret string }
-	if err := json.Unmarshal(data, &config); err != nil {
-		return nil, err
-	}
+	config.Endpoint = os.Getenv("S3_ENDPOINT")
+	config.Key = os.Getenv("S3_KEY")
+	config.Secret = os.Getenv("S3_SECRET")
 
 	client, err := minio.New(config.Endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(config.Key, config.Secret, ""),
