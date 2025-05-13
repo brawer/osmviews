@@ -98,10 +98,12 @@ func (s SharedTiles) Plot(dc *gg.Context, tileOffsets []uint32) {
 	}
 }
 
-type histogram struct {
-	imageWidth, imageHeight int
-	tileWidth, tileHeight   int
-	stride, zoom            int
+type histogramBuilder struct {
+	tiff                    *TiffReader
+	imageWidth, imageHeight uint32
+	tileWidth, tileHeight   uint32
+	stride                  uint32
+	zoom                    int
 	tileWidthBits           int
 	buckets                 map[uint64]Bucket
 }
@@ -113,20 +115,23 @@ type Bucket struct {
 	Sample BucketSample
 }
 
-func newHistogram(imageWidth, imageHeight, tileWidth, tileHeight int) *histogram {
-	h := &histogram{imageWidth: imageWidth, imageHeight: imageHeight, tileWidth: tileWidth, tileHeight: tileHeight}
-	h.stride = (imageWidth + tileWidth - 1) / tileWidth
-	h.zoom = math.Ilogb(float64(imageWidth))
-	h.tileWidthBits = math.Ilogb(float64(tileWidth))
+func newHistogramBuilder(tiff *TiffReader) *histogramBuilder {
+	h := &histogramBuilder{
+		tiff:       tiff,
+		imageWidth: tiff.imageWidth, imageHeight: tiff.imageHeight, tileWidth: tiff.tileWidth, tileHeight: tiff.tileHeight}
+
+	h.stride = (tiff.imageWidth + tiff.tileWidth - 1) / tiff.tileWidth
+	h.zoom = math.Ilogb(float64(tiff.imageWidth))
+	h.tileWidthBits = math.Ilogb(float64(tiff.tileWidth))
 	h.buckets = make(map[uint64]Bucket, 250000) // 210037 for 2022-01-24 data
 	return h
 }
 
-func (h *histogram) Add(data []float32, uses int, samples []TileIndex) {
+func (h *histogramBuilder) Add(data []float32, uses int, samples []TileIndex) {
 	numSamples, numSamplesTaken := 2, 0
-	for y := 0; y < h.tileHeight; y++ {
+	for y := uint32(0); y < h.tileHeight; y++ {
 		pos := y * h.tileWidth
-		for x := 0; x < h.tileWidth; x++ {
+		for x := uint32(0); x < h.tileWidth; x++ {
 			val := data[pos]
 			pos++
 			key := uint64(val + 0.5)
@@ -144,19 +149,19 @@ func (h *histogram) Add(data []float32, uses int, samples []TileIndex) {
 	}
 }
 
-func (h *histogram) makeBucket(val float32, count int64, tile TileIndex, x, y int) Bucket {
-	tileX := int(tile) % h.stride
-	pixelX := uint32(tileX<<h.tileWidthBits + x)
+func (h *histogramBuilder) makeBucket(val float32, count int64, tile TileIndex, x, y uint32) Bucket {
+	tileX := uint32(tile) % h.stride
+	pixelX := tileX<<h.tileWidthBits + x
 	lng := float32(pixelX)/float32(h.imageWidth)*360.0 - 180.0
 
-	tileY := int(tile) / h.stride
-	pixelY := uint32(tileY<<h.tileWidthBits + y)
+	tileY := uint32(tile) / h.stride
+	pixelY := tileY<<h.tileWidthBits + y
 	lat := float32(TileLatitude(uint8(h.zoom), pixelY) * (180 / math.Pi))
 
 	return Bucket{count, BucketSample{val, lat, lng}}
 }
 
-func (h *histogram) Plot(dc *gg.Context, buckets []Bucket) {
+func (h *histogramBuilder) Plot(dc *gg.Context, buckets []Bucket) {
 	ctr := make(map[uint64]int)
 	dc.SetRGB(1, 0, 0)
 	z := uint8(h.zoom - h.tileWidthBits)
@@ -174,8 +179,7 @@ func (h *histogram) Plot(dc *gg.Context, buckets []Bucket) {
 func buildHistogram(t *TiffReader) ([]Bucket, error) {
 	sharedTiles := findSharedTiles(t.tileOffsets)
 	stride := 1 << (math.Ilogb(float64(len(t.tileOffsets))) / 2)
-	hist := newHistogram(int(t.imageWidth), int(t.imageHeight), int(t.tileWidth), int(t.tileHeight))
-
+	hist := newHistogramBuilder(t)
 	data := make([]float32, t.tileWidth*t.tileHeight)
 	nn := 0
 	for _, y := range rand.Perm(stride) {
