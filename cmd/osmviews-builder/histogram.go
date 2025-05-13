@@ -5,10 +5,11 @@ import (
 	"math/rand"
 )
 
-// SharedTile keeps information about a tile is used more than once.
+// SharedTile keeps information about a tile that is used more than once.
 // In our GeoTIFF, 93.1% of all tile offsets point to a shared tile.
-// Usually these are patches of oceans or deserts into which no map user
-// ever zooms deeply.
+// Usually these are patches of oceans or deserts into which no OSM user
+// ever zooms deeply, so their view counts are identical across vast
+// areas of land or water.
 type SharedTile struct {
 	UseCount    int         // Total number of tiles sharing this data.
 	SampleTiles []TileIndex // A random sample of tiles that share this data.
