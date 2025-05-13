@@ -1,15 +1,11 @@
-// SPDX-FileCopyrightText: 2022 Sascha Brawer <sascha@brawer.ch>
+// SPDX-FileCopyrightText: 2025 Sascha Brawer <sascha@brawer.ch>
 // SPDX-License-Identifier: MIT
 
 package main
 
 import (
-	"bytes"
-	"compress/zlib"
-	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"io"
 	"math"
 	"math/rand"
 	"os"
@@ -77,153 +73,6 @@ type Sample []interface{} // [[Lat, Lng], Rank, Value]
 type Stats struct {
 	Median  int
 	Samples []Sample
-}
-
-type TiffReader struct {
-	r                                              io.ReadSeeker
-	order                                          binary.ByteOrder
-	imageWidth, imageHeight, tileWidth, tileHeight uint32
-	tileOffsets, tileByteCounts                    []uint32
-}
-
-func NewTiffReader(r io.ReadSeeker) (*TiffReader, error) {
-	tr := &TiffReader{r: r}
-	if err := tr.readFirstIFD(); err != nil {
-		return nil, err
-	}
-	return tr, nil
-}
-
-func (t *TiffReader) readFirstIFD() error {
-	var header [4]byte
-	if _, err := t.r.Read(header[:]); err != nil {
-		return err
-	}
-
-	// We only need to decode our own files, which are never big-endian.
-	if bytes.Equal(header[:], []byte{'I', 'I', 42, 0}) {
-		t.order = binary.LittleEndian
-	} else if bytes.Equal(header[:], []byte{'M', 'M', 0, 42}) {
-		t.order = binary.BigEndian
-	} else {
-		return fmt.Errorf("unsupported format")
-	}
-
-	var ifdOffset uint32
-	if err := binary.Read(t.r, t.order, &ifdOffset); err != nil {
-		return err
-	}
-	if _, err := t.r.Seek(int64(ifdOffset), os.SEEK_SET); err != nil {
-		return err
-	}
-
-	var numDirEntries uint16
-	if err := binary.Read(t.r, t.order, &numDirEntries); err != nil {
-		return err
-	}
-
-	var ifd bytes.Buffer
-	if _, err := io.CopyN(&ifd, t.r, int64(numDirEntries)*12); err != nil {
-		return err
-	}
-
-	for i := uint16(0); i < numDirEntries; i++ {
-		var tag, typ uint16
-		var count, value uint32
-		if err := binary.Read(&ifd, t.order, &tag); err != nil {
-			return err
-		}
-		if err := binary.Read(&ifd, t.order, &typ); err != nil {
-			return err
-		}
-		if err := binary.Read(&ifd, t.order, &count); err != nil {
-			return err
-		}
-		switch typ {
-		case 3: // SHORT
-			var sval1, sval2 uint16
-			if err := binary.Read(&ifd, t.order, &sval1); err != nil {
-				return err
-			}
-			binary.Read(&ifd, t.order, &sval2)
-			value = uint32(sval1)
-
-		default: // LONG
-			if err := binary.Read(&ifd, t.order, &value); err != nil {
-				return err
-			}
-		}
-
-		switch tag {
-		case 256: // ImageWidth
-			t.imageWidth = value
-
-		case 257: // ImageLength
-			t.imageHeight = value
-
-		case 322: // TileWidth
-			t.tileWidth = value
-
-		case 323: // TileLength
-			t.tileHeight = value
-
-		case 324: // TileOffsets
-			if a, err := t.readIntArray(typ, count, value); err == nil {
-				t.tileOffsets = a
-			} else {
-				return err
-			}
-
-		case 325: // TileByteCounts
-			if a, err := t.readIntArray(typ, count, value); err == nil {
-				t.tileByteCounts = a
-			} else {
-				return err
-			}
-		}
-	}
-
-	return nil
-}
-
-func (t *TiffReader) readIntArray(typ uint16, count, value uint32) ([]uint32, error) {
-	if typ != 4 {
-		return nil, fmt.Errorf("got type=%d, want 4", typ)
-	}
-
-	if _, err := t.r.Seek(int64(value), os.SEEK_SET); err != nil {
-		return nil, err
-	}
-
-	result := make([]uint32, count)
-	if err := binary.Read(t.r, t.order, &result); err != nil {
-		return nil, err
-	}
-
-	return result, nil
-}
-
-func (t *TiffReader) readTile(index TileIndex, data []float32) error {
-	if _, err := t.r.Seek(int64(t.tileOffsets[index]), os.SEEK_SET); err != nil {
-		return err
-	}
-
-	n := int64(t.tileByteCounts[index])
-	var buf bytes.Buffer
-	if _, err := io.CopyN(&buf, t.r, n); err != nil {
-		return err
-	}
-
-	reader, err := zlib.NewReader(&buf)
-	if err != nil {
-		return err
-	}
-
-	if err := binary.Read(reader, t.order, &data); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 type TileIndex int
@@ -394,7 +243,7 @@ func buildHistogram(t *TiffReader) ([]Bucket, error) {
 				continue
 			}
 			// if nn > 8 { break }
-			if err := t.readTile(ti, data); err != nil {
+			if err := t.ReadTile(int(ti), data); err != nil {
 				return nil, err
 			}
 			hist.Add(data, 1, []TileIndex{ti})
@@ -408,7 +257,7 @@ func buildHistogram(t *TiffReader) ([]Bucket, error) {
 	}
 
 	for _, st := range sharedTiles {
-		if err := t.readTile(st.SampleTiles[0], data); err != nil {
+		if err := t.ReadTile(int(st.SampleTiles[0]), data); err != nil {
 			return nil, err
 		}
 		tileUses := int64(st.UseCount) * int64(len(data))
