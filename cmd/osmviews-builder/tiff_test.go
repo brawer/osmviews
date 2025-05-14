@@ -38,6 +38,10 @@ func TestTiffReader(t *testing.T) {
 		t.Error("len(tileOffsets) should equal len(tileByteCounts")
 	}
 
+	if r.maxValue < 0.07098 || r.maxValue > 0.07099 {
+		t.Errorf("got maxValue=%f", r.maxValue)
+	}
+
 	data := make([]float32, r.tileWidth*r.tileHeight)
 	if err := r.ReadTile(1, data); err != nil {
 		t.Fatal(err)
