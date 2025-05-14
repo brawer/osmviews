@@ -19,6 +19,7 @@ type TiffReader struct {
 	order                                          binary.ByteOrder
 	imageWidth, imageHeight, tileWidth, tileHeight uint32
 	tileOffsets, tileByteCounts                    []uint32
+	maxValue                                       float32
 }
 
 func NewTiffReader(r io.ReadSeeker) (*TiffReader, error) {
@@ -65,6 +66,7 @@ func (t *TiffReader) readFirstIFD() error {
 	for i := uint16(0); i < numDirEntries; i++ {
 		var tag, typ uint16
 		var count, value uint32
+		var floatValue float32
 		if err := binary.Read(&ifd, t.order, &tag); err != nil {
 			return err
 		}
@@ -82,6 +84,11 @@ func (t *TiffReader) readFirstIFD() error {
 			}
 			binary.Read(&ifd, t.order, &sval2)
 			value = uint32(sval1)
+
+		case 11: // FLOAT
+			if err := binary.Read(&ifd, t.order, &floatValue); err != nil {
+				return err
+			}
 
 		default: // LONG
 			if err := binary.Read(&ifd, t.order, &value); err != nil {
@@ -115,6 +122,9 @@ func (t *TiffReader) readFirstIFD() error {
 			} else {
 				return err
 			}
+
+		case 341: // sMaxSampleValue
+			t.maxValue = floatValue
 		}
 	}
 
