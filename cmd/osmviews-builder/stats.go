@@ -80,6 +80,7 @@ type TileIndex int
 func (s SharedTiles) Plot(dc *gg.Context, tileOffsets []uint32) {
 	dc.SetRGB(1, 1, 1)
 	dc.Clear()
+
 	dc.SetRGB(0.8, 0.8, 1)
 	stride := 1 << (math.Ilogb(float64(len(tileOffsets))) / 2)
 	for ti, off := range tileOffsets {
@@ -236,12 +237,12 @@ func calcStats(hist []Bucket) (*Stats, error) {
 
 	stats := &Stats{Samples: make([]Sample, 0, 1000)}
 	rank := int64(1)
-	scaleX := 1000.0 / math.Log10(float64(totalCount))
-	scaleY := 1000.0 / math.Log10(float64(maxVal))
+	scaleX := 1000.0 / math.Log1p(float64(totalCount))
+	scaleY := 1000.0 / math.Log1p(float64(maxVal))
 	var lastX, lastY float64
 	for i, b := range hist {
-		x := math.Max(math.Log10(float64(rank))*scaleX, 0)
-		y := math.Max(math.Log10(float64(b.Sample.value))*scaleY, 0)
+		x := math.Max(math.Log1p(float64(rank))*scaleX, 0)
+		y := math.Max(math.Log1p(float64(b.Sample.value))*scaleY, 0)
 		distance := (x-lastX)*(x-lastX) + (y-lastY)*(y-lastY)
 		isLast := i == len(hist)-1
 		if isLast {
@@ -263,25 +264,29 @@ func calcStats(hist []Bucket) (*Stats, error) {
 func (s *Stats) Plot(path string) error {
 	firstValue := float64(s.Samples[0][2].(float32))
 	lastRank := float64(s.Samples[len(s.Samples)-1][1].(int64))
-	scaleX := 1000.0 / math.Log10(lastRank)
-	scaleY := 1000.0 / math.Log10(firstValue)
+	scaleX := 1000.0 / math.Log1p(lastRank)
+	scaleY := 1000.0 / math.Log1p(firstValue)
 
 	dc := gg.NewContext(1010, 1010)
 	dc.SetRGB(1, 1, 1)
 	dc.Clear()
 
+	dc.SetRGB(0.8, 0.8, 1)
+	dc.MoveTo(5, 5)
+	dc.LineTo(1005, 1005)
+
 	dc.SetRGB(0, 0.4, 1)
 	dc.MoveTo(5, 5)
 	for _, p := range s.Samples {
-		x := math.Max(math.Log10(float64(p[1].(int64)))*scaleX, 0)
-		y := math.Max(math.Log10(float64(p[2].(float32)))*scaleY, 0)
+		x := math.Max(math.Log1p(float64(p[1].(int64)))*scaleX, 0)
+		y := math.Max(math.Log1p(float64(p[2].(float32)))*scaleY, 0)
 		dc.LineTo(x+5.0, 1000.0-y+5.0)
 	}
 	dc.Stroke()
 
 	for _, p := range s.Samples {
-		x := math.Max(math.Log10(float64(p[1].(int64)))*scaleX, 0)
-		y := math.Max(math.Log10(float64(p[2].(float32)))*scaleY, 0)
+		x := math.Max(math.Log1p(float64(p[1].(int64)))*scaleX, 0)
+		y := math.Max(math.Log1p(float64(p[2].(float32)))*scaleY, 0)
 		dc.DrawCircle(x+5.0, 1000.0-y+5.0, 4.0)
 		dc.Fill()
 	}
