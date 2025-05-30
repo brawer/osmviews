@@ -9,20 +9,19 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"os"
 )
 
 // TiffReader can read TIFF images produced by our own pipeline.
 // It is not a general reader for arbitrary image files from other programs.
 type TiffReader struct {
-	r                                              io.ReadSeeker
+	r                                              io.ReaderAt
 	order                                          binary.ByteOrder
 	imageWidth, imageHeight, tileWidth, tileHeight uint32
 	tileOffsets, tileByteCounts                    []uint32
 	maxValue                                       float32
 }
 
-func NewTiffReader(r io.ReadSeeker) (*TiffReader, error) {
+func NewTiffReader(r io.ReaderAt) (*TiffReader, error) {
 	tr := &TiffReader{r: r}
 	if err := tr.readFirstIFD(); err != nil {
 		return nil, err
@@ -32,34 +31,29 @@ func NewTiffReader(r io.ReadSeeker) (*TiffReader, error) {
 
 // ReadFirstIFD reads the first Image File Desriptor (IFD) in the TIFF file.
 func (t *TiffReader) readFirstIFD() error {
-	var header [4]byte
-	if _, err := t.r.Read(header[:]); err != nil {
+	var header [8]byte
+	if _, err := t.r.ReadAt(header[:], 0); err != nil {
 		return err
 	}
 
-	if bytes.Equal(header[:], []byte{'I', 'I', 42, 0}) {
+	if bytes.Equal(header[:4], []byte{'I', 'I', 42, 0}) {
 		t.order = binary.LittleEndian
-	} else if bytes.Equal(header[:], []byte{'M', 'M', 0, 42}) {
+	} else if bytes.Equal(header[:4], []byte{'M', 'M', 0, 42}) {
 		t.order = binary.BigEndian
 	} else {
 		return fmt.Errorf("unsupported format")
 	}
 
-	var ifdOffset uint32
-	if err := binary.Read(t.r, t.order, &ifdOffset); err != nil {
-		return err
-	}
-	if _, err := t.r.Seek(int64(ifdOffset), os.SEEK_SET); err != nil {
-		return err
-	}
-
-	var numDirEntries uint16
-	if err := binary.Read(t.r, t.order, &numDirEntries); err != nil {
+	ifdOffset := int64(t.order.Uint32(header[4:8]))
+	numDirEntries, err := t.readUint16(ifdOffset)
+	if err != nil {
 		return err
 	}
 
 	var ifd bytes.Buffer
-	if _, err := io.CopyN(&ifd, t.r, int64(numDirEntries)*12); err != nil {
+	ifdSize := int64(numDirEntries) * 12
+	ifdReader := io.NewSectionReader(t.r, ifdOffset+2, ifdSize)
+	if _, err := io.CopyN(&ifd, ifdReader, ifdSize); err != nil {
 		return err
 	}
 
@@ -131,6 +125,22 @@ func (t *TiffReader) readFirstIFD() error {
 	return nil
 }
 
+// ReadUInt16 reads an unsigned 16-bit integer from the TIFF file,
+// starting at pos.
+func (t *TiffReader) readUint16(pos int64) (uint16, error) {
+	var buf [2]byte
+	n, err := t.r.ReadAt(buf[:], pos)
+	if err != nil {
+		return 0, err
+	}
+	if n != 2 {
+		return 0, io.ErrUnexpectedEOF
+	}
+
+	num := t.order.Uint16(buf[:])
+	return num, nil
+}
+
 // ReadIntArray reads an array of uint32 into memory. This is used
 // internally for reading TileOffsets and TileByteCounts.
 func (t *TiffReader) readIntArray(typ uint16, count, value uint32) ([]uint32, error) {
@@ -138,12 +148,9 @@ func (t *TiffReader) readIntArray(typ uint16, count, value uint32) ([]uint32, er
 		return nil, fmt.Errorf("got type=%d, want 4", typ)
 	}
 
-	if _, err := t.r.Seek(int64(value), os.SEEK_SET); err != nil {
-		return nil, err
-	}
-
 	result := make([]uint32, count)
-	if err := binary.Read(t.r, t.order, &result); err != nil {
+	reader := io.NewSectionReader(t.r, int64(value), int64(count)*4)
+	if err := binary.Read(reader, t.order, &result); err != nil {
 		return nil, err
 	}
 
@@ -151,23 +158,17 @@ func (t *TiffReader) readIntArray(typ uint16, count, value uint32) ([]uint32, er
 }
 
 // ReadTile reads a single image tile into memory.
+// Clients can execute parallel ReadTile calls on the same TiffReader.
 func (t *TiffReader) ReadTile(tileIndex int, data any) error {
-	if _, err := t.r.Seek(int64(t.tileOffsets[tileIndex]), os.SEEK_SET); err != nil {
-		return err
-	}
-
-	n := int64(t.tileByteCounts[tileIndex])
-	var buf bytes.Buffer
-	if _, err := io.CopyN(&buf, t.r, n); err != nil {
-		return err
-	}
-
-	reader, err := zlib.NewReader(&buf)
+	tileOffset := int64(t.tileOffsets[tileIndex])
+	tileSize := int64(t.tileByteCounts[tileIndex])
+	tileReader := io.NewSectionReader(t.r, tileOffset, tileSize)
+	zlibReader, err := zlib.NewReader(tileReader)
 	if err != nil {
 		return err
 	}
 
-	if err := binary.Read(reader, t.order, data); err != nil {
+	if err := binary.Read(zlibReader, t.order, data); err != nil {
 		return err
 	}
 
