@@ -26,9 +26,11 @@ type Quantizer struct {
 }
 
 type rankBucket struct {
-	count    int64
-	minValue float64
-	maxValue float64
+	count      int64
+	minValue   float64
+	maxValue   float64
+	logMinRank float64
+	logMaxRank float64
 }
 
 // RankBucketizer computes an image histogram over an input
@@ -92,14 +94,13 @@ func (r *rankBucketizer) bucketize() ([]rankBucket, error) {
 				select {
 				case <-ctx.Done():
 					return ctx.Err()
-				case t := <-work:
+				case t, more := <-work:
+					if !more {
+						return nil // channel closed
+					}
 					r.update(t.tile, t.useCount)
-				default:
-					return nil
 				}
-
 			}
-			return nil
 		})
 	}
 
@@ -107,7 +108,13 @@ func (r *rankBucketizer) bucketize() ([]rankBucket, error) {
 		return nil, err
 	}
 
-	// TODO: Post-processing. Aggregate counts to ranks, etc.
+	rank := int64(1)
+	for i, _ := range r.buckets {
+		bucket := &r.buckets[i]
+		bucket.logMinRank = math.Log(float64(rank))
+		bucket.logMaxRank = math.Log(float64(rank + bucket.count))
+	}
+
 	return r.buckets, nil
 }
 
