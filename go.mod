@@ -14,7 +14,7 @@ require (
 	github.com/minio/minio-go/v7 v7.0.91
 	github.com/orcaman/writerseeker v0.0.0-20200621085525-1d3f536ff85e
 	github.com/prometheus/client_golang v1.22.0
-	github.com/ulikunitz/xz v0.5.12
+	github.com/ulikunitz/xz v0.5.14
 	golang.org/x/sync v0.14.0
 )
 
