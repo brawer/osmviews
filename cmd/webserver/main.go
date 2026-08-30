@@ -70,8 +70,9 @@ func (ws *Webserver) HandleMain(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Fprintf(w, "%s",
 		`<!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+<meta charset="utf-8">
 <link href='https://tools-static.wmflabs.org/fontcdn/css?family=Roboto+Slab:400,700' rel='stylesheet' type='text/css'/>
 <link href='https://tools-static.wmflabs.org/fontcdn/css?family=Source+Code+Pro:400' rel='stylesheet' type='text/css'/>
 <meta name='viewport' content='width=device-width, initial-scale=1.0'>
@@ -86,9 +87,8 @@ h1 {
 }
 .osm { color: #ff0088 }
 p { margin-left: 5em }
-p.code {
+pre.code {
   margin-left: 9em;
-  display: block;
   white-space: pre;
   font-family: 'Source Code Pro', monospace;
 }
@@ -106,7 +106,7 @@ a:visited { color: #ffaed7 }
 
 <p><b>Use in Python:</b></p>
 
-<p class="code"># pip install osmviews
+<pre class="code"># pip install osmviews
 import osmviews
 osmviews.download('/tmp/osmviews.tiff')
 with osmviews.open('/tmp/osmviews.tiff') as o:
