@@ -11,8 +11,10 @@ For any location on the planet, up to ~150m/z18 resolution.
 * `cmd/osmviews-builder` is the pipeline that computes the data.
 * `docs` contains [documentation](docs/).
 
-Client libraries are maintained in separate repositories.
-For Python, see [brawer/osmviews-py](https://github.com/brawer/osmviews-py).
+Client libraries are maintained in separate repositories:
+
+* Python: [brawer/osmviews-py](https://github.com/brawer/osmviews-py)
+* Rust: [brawer/osmviews-rs](https://github.com/brawer/osmviews-rs)
 
 
 ## Roadmap to 1.0
