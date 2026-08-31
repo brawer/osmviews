@@ -30,21 +30,3 @@ Client libraries are maintained in separate repositories:
 * Rust: [brawer/osmviews-rs](https://github.com/brawer/osmviews-rs) [![crates.io](https://img.shields.io/crates/v/osmviews)](https://crates.io/crates/osmviews)
 
 Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
-
-
-## Roadmap to 1.0
-
-* Write documentation for the Python client.
-
-* Write documentation for the backend pipeline. Document the tricks
-  we use to process such a large dataset on a single machine in reasonable
-  time.
-
-* Improve the server homepage, display the histogram whose data already
-  gets computed.
-
-* Implement the OpenGIS WMTS protocol in the webserver.
-
-* Extend the webserver homepage to display a heatmap. Currently, users
-  can already point QGIS or another GIS to our GeoTIFF file, but not many
-  people know how to do this.
