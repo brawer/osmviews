@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: 2026 Sascha Brawer <sascha@brawer.ch>
+SPDX-License-Identifier: MIT
+-->
+
 # Add maintainers
 
 To become a project maintainer, do the following:
