@@ -28,6 +28,8 @@ Client libraries are maintained in separate repositories:
 * Python: [brawer/osmviews-py](https://github.com/brawer/osmviews-py) [![PyPI](https://img.shields.io/pypi/v/osmviews?label=pypi)](https://pypi.org/project/osmviews/)
 * Rust: [brawer/osmviews-rs](https://github.com/brawer/osmviews-rs) [![crates.io](https://img.shields.io/crates/v/osmviews)](https://crates.io/crates/osmviews)
 
+Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
+
 
 ## Roadmap to 1.0
 
