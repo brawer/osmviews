@@ -218,6 +218,7 @@ func GetTileLogs(week string, numDays int, client *http.Client, workdir string, 
 	if err := g.Wait(); err != nil {
 		return nil, err
 	}
+	logger.Printf("for week %s, fetched and sorted, %s", week, memStats())
 
 	// We write to a temporary file first, and rename it atomically
 	// once it is finished in usable state. This prevents hiccups
@@ -277,6 +278,7 @@ func GetTileLogs(week string, numDays int, client *http.Client, workdir string, 
 		logger.Printf("upload of %s to s3://osmviews/%s failed: %v", path, remotePath, err)
 		return nil, err
 	}
+	logger.Printf("for week %s, wrote %s", week, path)
 
 	// Open the file for reading and return a reader for it.
 	if f, err := os.Open(path); err == nil {

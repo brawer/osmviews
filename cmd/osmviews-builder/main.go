@@ -116,7 +116,8 @@ func main() {
 		if err := storage.PutFile(ctx, bucket, remoteStatsPath, localStatsPath, "application/json"); err != nil {
 			logger.Fatalf("uploading %s/%s: %v", bucket, remoteStatsPath, err)
 		}
-		logger.Printf("uploaded %s/%s and %s/%s", bucket, remotepath, bucket, remoteStatsPath)
+		logger.Printf("uploaded %s/%s and %s/%s; done, %s",
+			bucket, remotepath, bucket, remoteStatsPath, memStats())
 
 		if err := Cleanup(storage); err != nil {
 			logger.Fatalf("garbage-collecting old files in storage: %v", err)
@@ -205,6 +206,7 @@ func fetchWeeklyLogs(workdir string, storage Storage, maxWeeks int) (*weeklyLogs
 		readers = append(readers, r)
 		weights = append(weights, 7.0/float64(week.NumDays))
 	}
+	logger.Printf("all %d weeks ready, %s", len(weeks), memStats())
 
 	return &weeklyLogs{
 		readers:  readers,

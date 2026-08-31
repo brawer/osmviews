@@ -176,8 +176,8 @@ func paint(path string, zoom uint8, tilecounts []io.Reader, weights []float64, m
 			case <-subCtx.Done():
 				return subCtx.Err()
 			case <-progress.C:
-				logger.Printf("painting: %d tiles so far, %s elapsed",
-					painted, time.Since(start).Round(time.Second))
+				logger.Printf("painting: %d tiles so far, %s elapsed, %s",
+					painted, time.Since(start).Round(time.Second), memStats())
 			case c, more := <-ch:
 				if c.Key != tile {
 					if numCounts > 0 {
@@ -217,6 +217,6 @@ func paint(path string, zoom uint8, tilecounts []io.Reader, weights []float64, m
 	if err := painter.Close(); err != nil {
 		return err
 	}
-	logger.Printf("finished painting %s in %s", path, time.Since(start).Round(time.Second))
+	logger.Printf("finished painting %s in %s, %s", path, time.Since(start).Round(time.Second), memStats())
 	return nil
 }
