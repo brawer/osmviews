@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/bits"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -25,12 +26,26 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// Return a list of weeks for which OpenStreetMap has tile logs.
-// Weeks are returned in ISO 8601 format such as "2021-W07".
-// The result is sorted from least to most recent week.
-// We return only those weeks where OpenStreetMap has tile logs
-// for all seven days.
-func GetAvailableWeeks(client *http.Client) ([]string, error) {
+// WeekAvailability describes the OpenStreetMap tile-log data that is
+// available for one ISO week.
+type WeekAvailability struct {
+	Week    string // ISO 8601 week, eg. "2021-W07"
+	NumDays int    // number of days (1..7) that have a log file
+}
+
+// Return the weeks for which OpenStreetMap has tile logs, together with
+// how many of the week’s seven days actually have a log file. The result
+// is sorted from least to most recent week.
+//
+// Until mid-2026, OpenStreetMap published a log file for every single day,
+// and we only accepted weeks with all seven days present. Since then, only
+// a few days per week are published, so we accept any week with at least
+// one day and let the caller scale the counts by 7/NumDays. Weeks that are
+// not over yet (plus a two-day grace period for the last days to appear)
+// are skipped: their data would be incomplete, and the output file name
+// for the most recent week is keyed only on the week, so we would never
+// revisit it once written.
+func GetAvailableWeeks(client *http.Client, now time.Time) ([]WeekAvailability, error) {
 	url := "https://planet.openstreetmap.org/tile_logs/"
 	r, err := client.Get(url)
 	if err != nil {
@@ -59,45 +74,67 @@ func GetAvailableWeeks(client *http.Client) ([]string, error) {
 	// for Tuesday (0000100) and Sunday (0000001) for the 7th week of 2021.
 	// That is, Tuesday, February 16, and Sunday, February 21.
 	re := regexp.MustCompile(`<a href="tiles-(\d{4}-\d\d-\d\d)\.txt\.xz">`)
-	available := make(map[int]int8) // (year*100+isoweek) → 7 bits
+	available := make(map[int]uint8) // (year*100+isoweek) → 7 bits
 	for _, m := range re.FindAllSubmatch(body, -1) {
 		if t, err := time.Parse("2006-01-02", string(m[1])); err == nil {
 			year, week := t.ISOWeek()
-			available[year*100+week] |= 1 << int8(t.Weekday())
+			available[year*100+week] |= 1 << uint(t.Weekday())
 		}
 	}
 
-	// To our callers, we return weeks in ISO 8601 format, eg. "2021-W07".
-	result := make([]string, 0, len(available))
-	for week, days := range available {
-		if days == 127 { // server has logs for all seven days of this week
-			isoWeekString := fmt.Sprintf("%04d-W%02d", week/100, week%100)
-			result = append(result, isoWeekString)
+	now = now.UTC()
+	result := make([]WeekAvailability, 0, len(available))
+	for key, days := range available {
+		year, week := key/100, key%100
+		// Skip the current week and any week that ended in the last two
+		// days, giving OpenStreetMap time to publish that week's last days.
+		weekEnd := weekStart(year, week).AddDate(0, 0, 7)
+		if !weekEnd.AddDate(0, 0, 2).Before(now) {
+			continue
 		}
+		result = append(result, WeekAvailability{
+			Week:    fmt.Sprintf("%04d-W%02d", year, week),
+			NumDays: bits.OnesCount8(days),
+		})
 	}
-	sort.Strings(result)
+	sort.Slice(result, func(i, j int) bool { return result[i].Week < result[j].Week })
 	return result, nil
 }
 
 var tileLogRegexp = regexp.MustCompile(`^(\d+)/(\d+)/(\d+)\s+(\d+)$`)
 
+// weekLogName returns the file name (also used as the object-storage key
+// suffix) for the merged, sorted tile logs of one ISO week. Weeks with all
+// seven days keep the historical name; weeks with fewer days carry the day
+// count, so that a later run recomputes the week if OpenStreetMap has
+// published additional days in the meantime.
+func weekLogName(week string, numDays int) string {
+	if numDays >= 7 {
+		return fmt.Sprintf("tilelogs-%s.br", week)
+	}
+	return fmt.Sprintf("tilelogs-%s-%dd.br", week, numDays)
+}
+
 // GetTileLogs returns an io.Reader for the sorted log records of a week.
-// If cachedir contains already contains cached records for the requested week,
-// the data will be read from local disk. Otherwise, the seven daily log files
-// for the requested week are fetched from the OpenStreetMap planet server,
-// uncompressed, sorted by TileKey, and stored as a compressed file into
-// cachedir.
-func GetTileLogs(week string, client *http.Client, workdir string, storage Storage) (io.Reader, error) {
+// numDays is how many of the week’s seven days OpenStreetMap has published;
+// it selects the cache key and lets a later run pick up additional days.
+// If workdir already contains cached records for the requested week,
+// the data will be read from local disk. Otherwise, the daily log files
+// for the requested week are fetched from the OpenStreetMap planet server
+// (missing days are skipped), uncompressed, sorted by TileKey, and stored
+// as a compressed file into workdir and object storage.
+func GetTileLogs(week string, numDays int, client *http.Client, workdir string, storage Storage) (io.Reader, error) {
 	ctx := context.Background()
 	logger := log.Default()
 
-	path := filepath.Join(workdir, fmt.Sprintf("tilelogs-%s.br", week))
+	name := weekLogName(week, numDays)
+	path := filepath.Join(workdir, name)
 	if f, err := os.Open(path); err == nil {
 		logger.Printf("for week %s, reading %s from workdir", week, path)
 		return brotli.NewReader(f), nil
 	}
 
-	remotePath := fmt.Sprintf("internal/osmviews-builder/tilelogs-%s.br", week)
+	remotePath := fmt.Sprintf("internal/osmviews-builder/%s", name)
 	remotePathExists := false
 	if _, err := storage.Stat(ctx, "osmviews", remotePath); err == nil {
 		remotePathExists = true
@@ -208,7 +245,8 @@ func GetTileLogs(week string, client *http.Client, workdir string, storage Stora
 func fetchWeeklyTileLogs(week string, client *http.Client, ch chan<- extsort.SortType, ctx context.Context) error {
 	defer close(ch)
 
-	// Fetch the tile logs for the seven days in this week, in parallel.
+	// Fetch the tile logs for each day of this week that OpenStreetMap
+	// has published; days without a log file are skipped (see fetchTileLogs).
 	parsedYear, parsedWeek, err := ParseWeek(week)
 	if err != nil {
 		return err
@@ -234,6 +272,19 @@ func fetchTileLogs(day time.Time, client *http.Client, ch chan<- extsort.SortTyp
 	r, err := client.Get(url)
 	if err != nil {
 		return err
+	}
+	defer r.Body.Close()
+
+	// OpenStreetMap no longer publishes a log file for every day of the
+	// week. A missing day is expected; skip it. Its absence is accounted
+	// for by the 7/NumDays scaling factor (see GetAvailableWeeks).
+	if r.StatusCode == http.StatusNotFound {
+		log.Default().Printf("no tile logs for %04d-%02d-%02d, skipping",
+			day.Year(), day.Month(), day.Day())
+		return nil
+	}
+	if r.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to fetch %s, StatusCode=%d", url, r.StatusCode)
 	}
 
 	reader, err := xz.NewReader(r.Body)
