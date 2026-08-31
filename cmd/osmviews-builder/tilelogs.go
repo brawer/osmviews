@@ -5,11 +5,13 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"log"
 	"math/bits"
+	"math/rand"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -47,10 +49,17 @@ type WeekAvailability struct {
 // revisit it once written.
 func GetAvailableWeeks(client *http.Client, now time.Time) ([]WeekAvailability, error) {
 	url := "https://planet.openstreetmap.org/tile_logs/"
-	r, err := client.Get(url)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
+	r, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer r.Body.Close()
 
 	// Only accept HTTP responses with status code 200 OK
 	// and when the Content-Type header is HTML.
@@ -102,6 +111,16 @@ func GetAvailableWeeks(client *http.Client, now time.Time) ([]WeekAvailability, 
 }
 
 var tileLogRegexp = regexp.MustCompile(`^(\d+)/(\d+)/(\d+)\s+(\d+)$`)
+
+// retryPolicy controls how a single daily tile-log download is retried.
+type retryPolicy struct {
+	Attempts  int           // total attempts, including the first
+	BaseDelay time.Duration // backoff before the 2nd attempt; doubles after that
+	Timeout   time.Duration // deadline for one attempt, reading the body included
+}
+
+// fetchPolicy is a variable so that tests can tighten the timings.
+var fetchPolicy = retryPolicy{Attempts: 4, BaseDelay: time.Second, Timeout: 15 * time.Minute}
 
 // weekLogName returns the file name (also used as the object-storage key
 // suffix) for the merged, sorted tile logs of one ISO week. Weeks with all
@@ -269,25 +288,21 @@ func fetchTileLogs(day time.Time, client *http.Client, ch chan<- extsort.SortTyp
 	url := fmt.Sprintf(
 		"https://planet.openstreetmap.org/tile_logs/tiles-%04d-%02d-%02d.txt.xz",
 		day.Year(), day.Month(), day.Day())
-	r, err := client.Get(url)
+
+	body, err := fetchTileLogFile(ctx, client, url)
 	if err != nil {
 		return err
 	}
-	defer r.Body.Close()
-
-	// OpenStreetMap no longer publishes a log file for every day of the
-	// week. A missing day is expected; skip it. Its absence is accounted
-	// for by the 7/NumDays scaling factor (see GetAvailableWeeks).
-	if r.StatusCode == http.StatusNotFound {
+	if body == nil {
+		// OpenStreetMap no longer publishes a log file for every day of
+		// the week. A missing day is expected; its absence is accounted
+		// for by the 7/NumDays scaling factor (see GetAvailableWeeks).
 		log.Default().Printf("no tile logs for %04d-%02d-%02d, skipping",
 			day.Year(), day.Month(), day.Day())
 		return nil
 	}
-	if r.StatusCode != http.StatusOK {
-		return fmt.Errorf("failed to fetch %s, StatusCode=%d", url, r.StatusCode)
-	}
 
-	reader, err := xz.NewReader(r.Body)
+	reader, err := xz.NewReader(bytes.NewReader(body))
 	if err != nil {
 		return err
 	}
@@ -306,11 +321,73 @@ func fetchTileLogs(day time.Time, client *http.Client, ch chan<- extsort.SortTyp
 			ch <- tc
 		}
 	}
-	if err := scanner.Err(); err != nil {
-		return err
+	return scanner.Err()
+}
+
+// fetchTileLogFile downloads one daily tile-log file and returns its raw,
+// still xz-compressed bytes. It returns (nil, nil) when OpenStreetMap has
+// no file for that day (HTTP 404). Transient failures — connection errors,
+// timeouts, HTTP 429 and 5xx, short reads — are retried with exponential
+// backoff per fetchPolicy. The complete file is buffered before returning,
+// so a caller never streams records from a partial download; the external
+// sort would otherwise double-count them when a later attempt succeeds.
+func fetchTileLogFile(ctx context.Context, client *http.Client, url string) ([]byte, error) {
+	var lastErr error
+	for attempt := 1; attempt <= fetchPolicy.Attempts; attempt++ {
+		if attempt > 1 {
+			backoff := fetchPolicy.BaseDelay << (attempt - 2)
+			backoff += time.Duration(rand.Int63n(int64(backoff)/2 + 1)) // jitter
+			log.Default().Printf("retrying %s in %v (attempt %d/%d): %v",
+				url, backoff.Round(time.Millisecond), attempt, fetchPolicy.Attempts, lastErr)
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(backoff):
+			}
+		}
+
+		body, retryable, err := fetchOnce(ctx, client, url)
+		if err == nil {
+			return body, nil
+		}
+		lastErr = err
+		if !retryable {
+			return nil, err
+		}
+	}
+	return nil, lastErr
+}
+
+// fetchOnce performs a single GET, bounded by fetchPolicy.Timeout. A nil
+// body with a nil error means the server returned HTTP 404.
+func fetchOnce(ctx context.Context, client *http.Client, url string) (body []byte, retryable bool, err error) {
+	reqCtx, cancel := context.WithTimeout(ctx, fetchPolicy.Timeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, false, err
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, true, err // connection error or timeout: worth retrying
+	}
+	defer resp.Body.Close()
+
+	switch {
+	case resp.StatusCode == http.StatusNotFound:
+		return nil, false, nil
+	case resp.StatusCode == http.StatusTooManyRequests, resp.StatusCode >= 500:
+		return nil, true, fmt.Errorf("failed to fetch %s, StatusCode=%d", url, resp.StatusCode)
+	case resp.StatusCode != http.StatusOK:
+		return nil, false, fmt.Errorf("failed to fetch %s, StatusCode=%d", url, resp.StatusCode)
 	}
 
-	return nil
+	buf, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, true, err // short read: worth retrying
+	}
+	return buf, false, nil
 }
 
 // Reverse of Go’s time.ISOWeek() function.

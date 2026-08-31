@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -110,6 +111,31 @@ func main() {
 	}
 }
 
+// newHTTPClient returns the HTTP client used to fetch tile logs from
+// planet.openstreetmap.org. Its timeouts bound the cases where a
+// connection stalls without ever failing on its own. A hung fetch would
+// otherwise block the run indefinitely, and because the Toolforge job
+// runs with concurrencyPolicy: Forbid, every following scheduled run
+// would be skipped too. There is deliberately no overall Client.Timeout:
+// it would also abort a slow but healthy download of a large weekly log.
+// Individual daily-log requests additionally get a generous per-attempt
+// deadline and are retried with backoff (see fetchPolicy).
+func newHTTPClient() *http.Client {
+	return &http.Client{
+		Transport: &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
+			DialContext: (&net.Dialer{
+				Timeout:   30 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}).DialContext,
+			TLSHandshakeTimeout:   30 * time.Second,
+			ResponseHeaderTimeout: 2 * time.Minute,
+			IdleConnTimeout:       90 * time.Second,
+			ExpectContinueTimeout: 10 * time.Second,
+		},
+	}
+}
+
 // Fetch log data for up to `maxWeeks` weeks from planet.openstreetmap.org.
 // For each week, the available daily log files are fetched from OpenStreetMap
 // and combined into a single compressed file, stored on local disk and in
@@ -123,7 +149,7 @@ func main() {
 // and the ISO week string (like "2021-W28") for the last available week.
 func fetchWeeklyLogs(workdir string, storage Storage, maxWeeks int) ([]io.Reader, []float64, string, error) {
 	logger := log.Default()
-	client := &http.Client{}
+	client := newHTTPClient()
 	weeks, err := GetAvailableWeeks(client, time.Now())
 	if err != nil {
 		return nil, nil, "", err

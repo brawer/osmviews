@@ -116,6 +116,140 @@ func TestGetAvailableWeeksServerError(t *testing.T) {
 	}
 }
 
+// hangingTransport blocks every request until its context is done,
+// simulating a connection that stalls without ever failing.
+type hangingTransport struct{}
+
+func (hangingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	<-req.Context().Done()
+	return nil, req.Context().Err()
+}
+
+// flakyTransport fails the first failN requests for a daily log file
+// (with statusCode, or a connection error if statusCode is 0), then
+// serves testdata/rapperswil.xz.
+type flakyTransport struct {
+	failN      int
+	statusCode int
+	calls      int
+}
+
+func (f *flakyTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if !strings.Contains(req.URL.Path, "/tiles-") {
+		return nil, fmt.Errorf("unexpected request: %s", req.URL)
+	}
+	f.calls++
+	if f.calls <= f.failN {
+		if f.statusCode == 0 {
+			return nil, fmt.Errorf("simulated connection reset")
+		}
+		h := make(http.Header)
+		h.Set("Content-Type", "text/plain")
+		return &http.Response{
+			StatusCode: f.statusCode,
+			Body:       ioutil.NopCloser(strings.NewReader("nope")),
+			Header:     h,
+		}, nil
+	}
+	body, err := os.Open("testdata/rapperswil.xz")
+	if err != nil {
+		return nil, err
+	}
+	h := make(http.Header)
+	h.Set("Content-Type", "application/x-xz")
+	return &http.Response{StatusCode: 200, Body: body, Header: h}, nil
+}
+
+func withFastRetries(t *testing.T, attempts int) {
+	t.Helper()
+	prev := fetchPolicy
+	fetchPolicy = retryPolicy{Attempts: attempts, BaseDelay: time.Millisecond, Timeout: 2 * time.Second}
+	t.Cleanup(func() { fetchPolicy = prev })
+}
+
+func TestFetchTileLogFile_RequestTimeout(t *testing.T) {
+	withFastRetries(t, 2)
+	fp := fetchPolicy
+	fp.Timeout = 50 * time.Millisecond
+	fetchPolicy = fp
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := fetchTileLogFile(context.Background(),
+			&http.Client{Transport: hangingTransport{}},
+			"https://planet.openstreetmap.org/tile_logs/tiles-2567-03-16.txt.xz")
+		done <- err
+	}()
+
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("expected a timeout error, got nil")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("fetchTileLogFile did not return after the request timeout")
+	}
+}
+
+func TestFetchTileLogFile_RetriesTransientFailures(t *testing.T) {
+	withFastRetries(t, 4)
+	for _, tc := range []struct {
+		name   string
+		status int
+	}{
+		{"connection error", 0},
+		{"http 503", 503},
+		{"http 429", 429},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ft := &flakyTransport{failN: 2, statusCode: tc.status}
+			body, err := fetchTileLogFile(context.Background(),
+				&http.Client{Transport: ft},
+				"https://planet.openstreetmap.org/tile_logs/tiles-2567-03-16.txt.xz")
+			if err != nil {
+				t.Fatalf("expected success after retries, got %v", err)
+			}
+			if len(body) == 0 {
+				t.Error("expected a non-empty body")
+			}
+			if ft.calls != 3 {
+				t.Errorf("expected 3 attempts, got %d", ft.calls)
+			}
+		})
+	}
+}
+
+func TestFetchTileLogFile_GivesUp(t *testing.T) {
+	withFastRetries(t, 3)
+	ft := &flakyTransport{failN: 99, statusCode: 503}
+	_, err := fetchTileLogFile(context.Background(),
+		&http.Client{Transport: ft},
+		"https://planet.openstreetmap.org/tile_logs/tiles-2567-03-16.txt.xz")
+	if err == nil {
+		t.Fatal("expected an error after exhausting retries")
+	}
+	if ft.calls != 3 {
+		t.Errorf("expected 3 attempts, got %d", ft.calls)
+	}
+}
+
+func TestFetchTileLogFile_NotFound(t *testing.T) {
+	withFastRetries(t, 4)
+	ft := &flakyTransport{failN: 1, statusCode: 404}
+	body, err := fetchTileLogFile(context.Background(),
+		&http.Client{Transport: ft},
+		"https://planet.openstreetmap.org/tile_logs/tiles-2567-03-16.txt.xz")
+	if err != nil {
+		t.Fatalf("404 should not be an error, got %v", err)
+	}
+	if body != nil {
+		t.Errorf("404 should return a nil body, got %d bytes", len(body))
+	}
+	if ft.calls != 1 {
+		t.Errorf("404 must not be retried; got %d attempts", ft.calls)
+	}
+}
+
 func TestGetTileLogs(t *testing.T) {
 	client := &http.Client{Transport: &FakeOSMPlanet{}}
 	workdir, err := ioutil.TempDir("", "tilelogs_test")
