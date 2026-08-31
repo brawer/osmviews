@@ -5,6 +5,7 @@ package main
 
 import (
 	"encoding/json"
+	"log"
 	"math"
 	"math/rand"
 	"os"
@@ -29,6 +30,7 @@ func BuildStats(tiffPath, statsPath, plotPath string) error {
 	if err != nil {
 		return err
 	}
+	log.Default().Printf("stats: histogram of %d buckets, %s", len(hist), memStats())
 
 	stats, err := calcStats(hist)
 	if err != nil {
