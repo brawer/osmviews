@@ -14,21 +14,27 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/brawer/osmviews/v2/internal/version"
 	//"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-// ServerVersion is returned to HTTP clients as the Server header.
-// In released server binaries, the value of this variable is
-// overwritten to a string that includes the tagged release version,
-// for example "OSMViews/0.7". The release process does this by passing
-// the -X flag to the Go compiler/linker.
+// ServerVersion is returned to HTTP clients as the Server header. A
+// release build overwrites it via a linker flag
+// (-ldflags "-X main.ServerVersion=OSMViews/0.7"); otherwise main() fills
+// in the source revision from the build info.
 var ServerVersion = "OSMViews"
 
 func main() {
+	ServerVersion = version.Resolve(ServerVersion)
 	port := flag.Int("port", 0, "port for serving HTTP requests")
 	workdir := flag.String("workdir", "webserver-workdir", "path to working directory on local disk")
+	showVersion := flag.Bool("version", false, "print version and exit")
 	flag.Parse()
+	if *showVersion {
+		fmt.Println(ServerVersion)
+		return
+	}
 
 	if *port == 0 {
 		*port, _ = strconv.Atoi(os.Getenv("PORT"))
@@ -56,7 +62,7 @@ func main() {
 	http.HandleFunc("/robots.txt", server.HandleRobotsTxt)
 	http.Handle("/metrics", promhttp.Handler())
 	http.HandleFunc("/download/", server.HandleDownload)
-	log.Printf("Listening for HTTP requests on port %d", *port)
+	log.Printf("%s listening for HTTP requests on port %d", ServerVersion, *port)
 	err = http.ListenAndServe(":"+strconv.Itoa(*port), nil)
 	cancel()
 	log.Fatalf("HTTP server stopped: %v", err)

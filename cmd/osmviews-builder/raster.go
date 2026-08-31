@@ -29,10 +29,10 @@ type TiffMetadata struct {
 	DateTime time.Time
 }
 
-// Name of the producing software to embed in output TIFF files.
-// When a release is cut, our replease script passes a flag to
-// the Go compiler which overwrites this string with a software
-// name that also contains the release tag, like "OSMViews/0.7.3".
+// SoftwareVersion is written into the Software tag (305) of every output
+// GeoTIFF. A release build overwrites it via a linker flag
+// (-ldflags "-X main.SoftwareVersion=OSMViews/0.7.3"); otherwise main()
+// fills in the source revision via internal/version.
 var SoftwareVersion = "OSMViews"
 
 type Raster struct {
