@@ -11,6 +11,10 @@ that let us build a zoom-18 raster with global coverage in a few hundred
 megabytes of RAM, and keep the resulting file to a few hundred megabytes on
 disk.
 
+Those memory- and size-bounding techniques are also written up, in a more
+formal and general form, as a
+[defensive publication](defensive-publication.md).
+
 ## Background
 
 ### The metric: view density
