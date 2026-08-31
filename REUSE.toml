@@ -1,0 +1,8 @@
+version = 1
+
+# The root LICENSE file duplicates LICENSES/MIT.txt so that GitHub, whose
+# license detection is unreliable at finding LICENSES/, still recognises it.
+[[annotations]]
+path = "LICENSE"
+SPDX-FileCopyrightText = "2026 Sascha Brawer <sascha@brawer.ch>"
+SPDX-License-Identifier = "MIT"

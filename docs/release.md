@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: 2026 Sascha Brawer <sascha@brawer.ch>
+SPDX-License-Identifier: MIT
+-->
+
 # Release
 
 Release automation is blocked on

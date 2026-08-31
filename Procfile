@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2025 Sascha Brawer <sascha@brawer.ch>
+# SPDX-FileCopyrightText: 2026 Sascha Brawer <sascha@brawer.ch>
 # SPDX-License-Identifier: MIT
 #
 # Heroku-like Procfile for Wikimedia Toolforge Build Service
