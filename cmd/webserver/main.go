@@ -112,26 +112,29 @@ a:visited { color: #ffaed7 }
 <br/>Updated weekly. Aggregated over the past 52 weeks to smoothen seasonal effects.
 <br/>For any location on the planet, up to ~150m/z18 resolution.</p>
 
-<p><b>Use in Python:</b></p>
+<p><b>Use from Python:</b></p>
 
 <pre class="code"># pip install osmviews
 import osmviews
-osmviews.download('/tmp/osmviews.tiff')
-with osmviews.open('/tmp/osmviews.tiff') as o:
-    print(f'Tokyo, Shibuya:      {o.rank( 35.658514, 139.701330):>9.2f}')
-    print(f'Tokyo, Sumida:       {o.rank( 35.710719, 139.801547):>9.2f}')
-    print(f'Zürich, Altstetten:  {o.rank( 47.391485,   8.488945):>9.2f}')
-    print(f'Zürich, Witikon:     {o.rank( 47.358651,   8.590251):>9.2f}')
-    print(f'Ushuaia, Costa Este: {o.rank(-54.794395, -68.251958):>9.2f}')
-    print(f'Ushuaia, Las Reinas: {o.rank(-54.769225, -68.279174):>9.2f}')
 
-Tokyo, Shibuya:      227437.98
-Tokyo, Sumida:        60537.62
-Zürich, Altstetten:   37883.31
-Zürich, Witikon:      11711.94
-Ushuaia, Costa Este:   2697.14
-Ushuaia, Las Reinas:    257.89
+# Fetch the GeoTIFF (~594 MB, updated weekly) from osmviews.DOWNLOAD_URL
+# to a local file, then look up locations by (longitude, latitude):
+with osmviews.open('osmviews.tiff') as o:
+    print(f'Tokyo, Shibuya:      {o.rank(139.7013,  35.6586):.2f}')
+    print(f'Zürich, Altstetten:  {o.rank(  8.4889,  47.3915):.2f}')
+    print(f'Ushuaia:             {o.rank(-68.3030, -54.8019):.2f}')
+    print(f'Sahara:              {o.rank( 13.0000,  23.0000):.2f}')
+
+Tokyo, Shibuya:      0.69
+Zürich, Altstetten:  0.66
+Ushuaia:             0.56
+Sahara:              0.00
 </pre>
+
+<p>Ranks range from 0.0 (never viewed) to 1.0 (most viewed). For
+high-throughput lookups, use the
+<a href="https://github.com/brawer/osmviews-rs">Rust client</a>, which is
+considerably faster than the Python one.</p>
 
 <p>
 <b>Author:</b> <a href="https://brawer.ch/">Sascha Brawer</a>
