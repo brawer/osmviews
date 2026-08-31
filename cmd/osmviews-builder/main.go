@@ -14,16 +14,25 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/brawer/osmviews/v2/internal/version"
 )
 
 func main() {
+	SoftwareVersion = version.Resolve(SoftwareVersion)
 	ctx := context.Background()
 
 	workdir := flag.String("workdir", "osmviews-builder-workdir", "path to working directory")
+	showVersion := flag.Bool("version", false, "print version and exit")
 	flag.Parse()
+	if *showVersion {
+		fmt.Println(SoftwareVersion)
+		return
+	}
 
 	logger := log.Default()
 	logger.SetFlags(log.Ldate | log.Ltime | log.LUTC | log.Lshortfile)
+	logger.Printf("starting %s", SoftwareVersion)
 
 	if *workdir != "" {
 		if err := os.MkdirAll(*workdir, 0755); err != nil {
