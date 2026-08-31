@@ -15,7 +15,7 @@ disk.
 
 ### The metric: view density
 
-OpenStreetMap serves its maps as small square images ("map tiles"). Every time
+OpenStreetMap serves its maps as small square images (“map tiles”). Every time
 someone looks at a place on an OSM-based map, their browser fetches the tiles
 covering that place. The OSM Foundation publishes daily logs of how many times
 each tile was requested.
@@ -52,7 +52,7 @@ whole file:
 * reduced-resolution **overviews** (a pyramid: half-size, quarter-size, …) are
   included, so a reader zoomed out fetches a small overview instead of the full
   image;
-* the IFDs and a small block of "ghost" metadata sit at the **front** of the
+* the IFDs and a small block of “ghost” metadata sit at the **front** of the
   file (`LAYOUT=IFDS_BEFORE_DATA`), so one range request for the header tells
   the client where every tile is.
 
@@ -103,9 +103,9 @@ more than a small window of tiles in memory.
 ## Stage 1 — weekly merged logs (`tilelogs.go`, `GetTileLogs`)
 
 For each ISO week we need one stream of `TileCount{TileKey, count}` records,
-sorted by TileKey, with one record per tile (the week's total).
+sorted by TileKey, with one record per tile (the week’s total).
 
-1. Fetch the week's daily `.txt.xz` files from OSM. Since mid-2026 OSM only
+1. Fetch the week’s daily `.txt.xz` files from OSM. Since mid-2026 OSM only
    publishes a few days per week; missing days are skipped and the weekly total
    is later scaled by `7 / daysPresent` so a partial week still estimates a full
    one. (Upstream: openstreetmap/operations#1398.)
@@ -131,7 +131,7 @@ Input: up to 52 weekly readers, each already TileKey-sorted, plus a
 
 A min-heap of the 52 stream cursors, ordered by TileKey (then by count). Pop the
 smallest, emit it, advance that stream, repeat. As each record is read, its
-count is multiplied by the week's weight.
+count is multiplied by the week’s weight.
 
 Output: a single stream of `TileCount`, globally TileKey-sorted — so **all 52
 weeks' records for a given tile arrive consecutively**, then all records for the
@@ -168,7 +168,7 @@ one currently being filled** — at most 11 of them, ~2.8 MiB.
 
 This works *because* the input arrives in quad-tree pre-order. When a record
 arrives for a raster tile that the current raster does not contain, we are
-**permanently finished** with the current raster and any ancestors that don't
+**permanently finished** with the current raster and any ancestors that don’t
 contain the new one: pre-order guarantees no later record can fall inside them.
 So `setupRaster`:
 
@@ -208,7 +208,7 @@ output about 55% of all raster tiles come out uniform this way; each is handed t
 
 `WriteUniform` keeps a map from colour → the tile that first used it. Every
 later uniform tile of the same colour does **not** store its own pixel data;
-its entry in the IFD's `TileOffsets` / `TileByteCounts` arrays is set to point
+its entry in the IFD’s `TileOffsets` / `TileByteCounts` arrays is set to point
 at the **same byte range** as the first one.
 
 So each zoom level of the file contains just one compressed 256×256 block of
@@ -218,21 +218,21 @@ is unusual — most TIFF writers never do it — but it is explicitly allowed by
 TIFF 6.0 specification, and readers (GDAL, `geotiff.js`, `tifffile`) handle it
 correctly.
 
-This is also why the COG "ghost" metadata deliberately omits
+This is also why the COG “ghost” metadata deliberately omits
 `BLOCK_ORDER=ROW_MAJOR`: declaring a strict tile order would forbid the sharing.
 
 ### 3. Storing the logarithm of the value
 
 Pixels are stored as `ln(1 + viewsPerKm²)`, not the raw density. The log
-transform doesn't change the ordering of pixels, but it turns a range of
-`0 … ~230000` into a roughly linear `0 … ~12`, which visualisation tools (QGIS,
+transform doesn’t change the ordering of pixels, but it maps a
+`0`–`230000` range onto a roughly linear `0`–`12`, which visualisation tools (QGIS,
 `plotty`) can colour-map without manual fiddling. The maximum (also logged) is
 written into the `SMaxSampleValue` tag; the clients read it to normalise
-`rank()` to `0.0 … 1.0`.
+`rank()` to `0.0`–`1.0`.
 
 ### Writing the file
 
-Because a COG puts the IFDs before the pixel data, the tile offsets aren't known
+Because a COG puts the IFDs before the pixel data, the tile offsets aren’t known
 when the IFDs are written. `RasterWriter` writes the compressed tiles to a
 temporary file as it goes, then in `writeTiff` streams the IFDs (with
 placeholder offsets), then the tile data, and finally seeks back to patch every
@@ -240,7 +240,7 @@ offset (`writeIFDList`, `patchOffset`). Classic little-endian TIFF, not BigTIFF 
 the output stays under the 4 GiB limit.
 
 Provenance is written into standard tags: `ImageDescription` (the ingested-log
-date range and generation time), `Software` (the build's version or git commit),
+date range and generation time), `Software` (the build’s version or git commit),
 `DateTime` (the date of the most recent ingested daily log).
 
 ## Stage 3 — statistics (`stats.go`)
@@ -265,7 +265,7 @@ plots it) and a PNG.
 
 The builder runs as a daily scheduled job on Toolforge. Each run:
 
-1. lists the available weeks (skipping any that aren't finished yet);
+1. lists the available weeks (skipping any that aren’t finished yet);
 2. fetches or reuses the 52 weekly files;
 3. checks whether the output for the most recent week is already in object
    storage — if so, it is **done** (the run is a no-op);
