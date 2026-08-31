@@ -5,7 +5,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"math"
 	"math/rand"
 	"os"
@@ -77,28 +76,6 @@ type Stats struct {
 
 type TileIndex int
 
-func (s SharedTiles) Plot(dc *gg.Context, tileOffsets []uint32) {
-	dc.SetRGB(1, 1, 1)
-	dc.Clear()
-
-	dc.SetRGB(0.8, 0.8, 1)
-	stride := 1 << (math.Ilogb(float64(len(tileOffsets))) / 2)
-	for ti, off := range tileOffsets {
-		if s[off] != nil {
-			dc.SetPixel(ti%stride, ti/stride)
-		}
-	}
-
-	dc.SetRGB(0.6, 0.6, 1)
-	for _, t := range s {
-		for _, tile := range t.SampleTiles {
-			tileX, tileY := int(tile)%stride, int(tile)/stride
-			dc.DrawCircle(float64(tileX), float64(tileY), 1.5)
-			dc.Fill()
-		}
-	}
-}
-
 type histogramBuilder struct {
 	tiff                    *TiffReader
 	imageWidth, imageHeight uint32
@@ -160,21 +137,6 @@ func (h *histogramBuilder) makeBucket(val float32, count int64, tile TileIndex, 
 	lat := float32(TileLatitude(uint8(h.zoom), pixelY) * (180 / math.Pi))
 
 	return Bucket{count, BucketSample{val, lat, lng}}
-}
-
-func (h *histogramBuilder) Plot(dc *gg.Context, buckets []Bucket) {
-	ctr := make(map[uint64]int)
-	dc.SetRGB(1, 0, 0)
-	z := uint8(h.zoom - h.tileWidthBits)
-	var total int64
-	for _, b := range buckets {
-		x, y := TileFromLatLng(float64(b.Sample.lat), float64(b.Sample.lng), z)
-		dc.DrawCircle(float64(x), float64(y), 3.0)
-		dc.Fill()
-		ctr[uint64(y)*1024+uint64(x)] += 1
-		total += b.Count
-	}
-	fmt.Println("**** Number of unique lat/lng samples:", len(ctr))
 }
 
 func buildHistogram(t *TiffReader) ([]Bucket, error) {

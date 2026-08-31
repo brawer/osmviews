@@ -81,6 +81,13 @@ func NewStorage() (Storage, error) {
 	endpoint := os.Getenv("S3_ENDPOINT")
 	key := os.Getenv("S3_KEY")
 	secret := os.Getenv("S3_SECRET")
+	for name, value := range map[string]string{
+		"S3_ENDPOINT": endpoint, "S3_KEY": key, "S3_SECRET": secret,
+	} {
+		if value == "" {
+			return nil, fmt.Errorf("environment variable %s is not set", name)
+		}
+	}
 	client, err := minio.New(endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(key, secret, ""),
 		Secure: true,
@@ -171,6 +178,7 @@ func Download(s Storage, bucket string, remotePath string, localPath string) err
 	if err = os.Rename(out.Name(), localPath); err != nil {
 		os.Remove(out.Name())
 		logger.Printf("%s: %v", errMsg, err)
+		return err
 	}
 	return nil
 }
