@@ -39,14 +39,18 @@ type WeekAvailability struct {
 // how many of the week’s seven days actually have a log file. The result
 // is sorted from least to most recent week.
 //
-// Until mid-2026, OpenStreetMap published a log file for every single day,
-// and we only accepted weeks with all seven days present. Since then, only
-// a few days per week are published, so we accept any week with at least
-// one day and let the caller scale the counts by 7/NumDays. Weeks that are
-// not over yet (plus a two-day grace period for the last days to appear)
-// are skipped: their data would be incomplete, and the output file name
-// for the most recent week is keyed only on the week, so we would never
-// revisit it once written.
+// Historically, OpenStreetMap published a log file for every single day,
+// and we only accepted weeks with all seven days present. Since mid-2026
+// only a few days per week appear -- possibly an upstream problem in the
+// tile-log pipeline, tracked in
+// https://github.com/openstreetmap/operations/issues/1398. We therefore
+// accept any week with at least one day and let the caller scale the
+// counts by 7/NumDays. If full weeks return, NumDays is 7 and the factor
+// is 1.0, so this stays correct either way. Weeks that are not over yet
+// (plus a two-day grace period for the last days to appear) are skipped:
+// their data would be incomplete, and the output file name for the most
+// recent week is keyed only on the week, so we would never revisit it
+// once written.
 func GetAvailableWeeks(client *http.Client, now time.Time) ([]WeekAvailability, error) {
 	url := "https://planet.openstreetmap.org/tile_logs/"
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
@@ -294,9 +298,10 @@ func fetchTileLogs(day time.Time, client *http.Client, ch chan<- extsort.SortTyp
 		return err
 	}
 	if body == nil {
-		// OpenStreetMap no longer publishes a log file for every day of
-		// the week. A missing day is expected; its absence is accounted
-		// for by the 7/NumDays scaling factor (see GetAvailableWeeks).
+		// OpenStreetMap does not currently publish a log file for every
+		// day of the week (see the note on GetAvailableWeeks). A missing
+		// day is expected; its absence is accounted for by the 7/NumDays
+		// scaling factor.
 		log.Default().Printf("no tile logs for %04d-%02d-%02d, skipping",
 			day.Year(), day.Month(), day.Day())
 		return nil
