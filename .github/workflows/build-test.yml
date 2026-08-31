@@ -10,11 +10,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Check out source code
-      uses: actions/checkout@v3
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
     - name: Install Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
       with:
-        go-version: 1.24
+        go-version-file: go.mod
     - name: Build
       run: |
           go build -o artifacts/builder -ldflags="-s -w -X main.SoftwareVersion=OSMViews/${{github.ref_name}}" -v ./cmd/osmviews-builder
