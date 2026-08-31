@@ -135,8 +135,8 @@ count is multiplied by the week’s weight.
 
 Output: a single stream of `TileCount`, globally TileKey-sorted — so **all 52
 weeks' records for a given tile arrive consecutively**, then all records for the
-next tile, in quad-tree pre-order. Memory is O(52): the heap plus one buffered
-line per week.
+next tile, in quad-tree pre-order. Memory use is constant: the heap holds one
+entry per week (at most 52), each buffering a single line.
 
 ### Goroutine B: the painter (`paint.go` consumer loop, `Painter`)
 
