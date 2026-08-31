@@ -1,15 +1,13 @@
 # SPDX-FileCopyrightText: 2026 Sascha Brawer <sascha@brawer.ch>
 # SPDX-License-Identifier: MIT
 
-name: Build, test, and release
+name: CI
 
 on: [push, pull_request]
 
 jobs:
-  build-test-release:
+  build-test:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
     - name: Check out source code
       uses: actions/checkout@v3
