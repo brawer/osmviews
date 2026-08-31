@@ -21,7 +21,7 @@ For any location on the planet, up to ~150m/z18 resolution.
 
 * `cmd/webserver` is the [OSMViews webserver](https://osmviews.toolforge.org).
 * `cmd/osmviews-builder` is the pipeline that computes the data.
-* [`TECHNICAL_DESIGN.md`](TECHNICAL_DESIGN.md) explains how it all works.
+* [`docs/technical-design.md`](docs/technical-design.md) explains how it all works.
 * `docs` contains further [documentation](docs/).
 
 Client libraries are maintained in separate repositories:
