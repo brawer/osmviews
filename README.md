@@ -6,6 +6,7 @@ SPDX-License-Identifier: MIT
 # OSMViews
 
 [![CI](https://github.com/brawer/osmviews/actions/workflows/build-test.yml/badge.svg)](https://github.com/brawer/osmviews/actions/workflows/build-test.yml)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/brawer/osmviews/badge)](https://scorecard.dev/viewer/?uri=github.com/brawer/osmviews)
 [![Version](https://img.shields.io/github/v/tag/brawer/osmviews?sort=semver&label=version)](https://github.com/brawer/osmviews/tags)
 [![REUSE status](https://api.reuse.software/badge/github.com/brawer/osmviews)](https://api.reuse.software/info/github.com/brawer/osmviews)
 [![Code: MIT](https://img.shields.io/badge/code-MIT-blue.svg)](LICENSE)
