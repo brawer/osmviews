@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 func main() {
@@ -42,7 +43,7 @@ func main() {
 	}
 
 	maxWeeks := 52 // 1 year
-	tilecounts, lastWeek, err := fetchWeeklyLogs(*workdir, storage, maxWeeks)
+	tilecounts, weights, lastWeek, err := fetchWeeklyLogs(*workdir, storage, maxWeeks)
 	if err != nil {
 		logger.Fatal(err)
 	}
@@ -80,7 +81,7 @@ func main() {
 	}
 
 	// Paint the output GeoTIFF file.
-	if err := paint(localpath, 18, tilecounts, ctx); err != nil {
+	if err := paint(localpath, 18, tilecounts, weights, ctx); err != nil {
 		logger.Fatal(err)
 	}
 
@@ -110,19 +111,25 @@ func main() {
 }
 
 // Fetch log data for up to `maxWeeks` weeks from planet.openstreetmap.org.
-// For each week, the seven daily log files are fetched from OpenStreetMap,
-// and combined into a one single compressed file, stored on local disk.
-// If this weekly file already exists on disk, we return its content directly
-// without re-fetching that week from the server. Therefore, if this tool
-// is run periodically, it will only fetch the content that has not been
-// downloaded before. The result is an array of readers (one for each week),
+// For each week, the available daily log files are fetched from OpenStreetMap
+// and combined into a single compressed file, stored on local disk and in
+// object storage. If this weekly file already exists, we return its content
+// directly without re-fetching that week from the server. Therefore, if this
+// tool is run periodically, it will only fetch content that has not been
+// downloaded before.
+//
+// The results are an array of readers (one per week), a parallel array of
+// weights (7/NumDays, to extrapolate weeks with missing days to a full week),
 // and the ISO week string (like "2021-W28") for the last available week.
-func fetchWeeklyLogs(workdir string, storage Storage, maxWeeks int) ([]io.Reader, string, error) {
+func fetchWeeklyLogs(workdir string, storage Storage, maxWeeks int) ([]io.Reader, []float64, string, error) {
 	logger := log.Default()
 	client := &http.Client{}
-	weeks, err := GetAvailableWeeks(client)
+	weeks, err := GetAvailableWeeks(client, time.Now())
 	if err != nil {
-		return nil, "", err
+		return nil, nil, "", err
+	}
+	if len(weeks) == 0 {
+		return nil, nil, "", fmt.Errorf("OpenStreetMap has no tile logs")
 	}
 
 	if len(weeks) > maxWeeks {
@@ -131,16 +138,18 @@ func fetchWeeklyLogs(workdir string, storage Storage, maxWeeks int) ([]io.Reader
 
 	logger.Printf(
 		"found %d weeks with OpenStreetMap tile logs, from %s to %s",
-		len(weeks), weeks[0], weeks[len(weeks)-1])
+		len(weeks), weeks[0].Week, weeks[len(weeks)-1].Week)
 
 	readers := make([]io.Reader, 0, len(weeks))
+	weights := make([]float64, 0, len(weeks))
 	for _, week := range weeks {
-		if r, err := GetTileLogs(week, client, workdir, storage); err == nil {
-			readers = append(readers, r)
-		} else {
-			return nil, "", err
+		r, err := GetTileLogs(week.Week, week.NumDays, client, workdir, storage)
+		if err != nil {
+			return nil, nil, "", err
 		}
+		readers = append(readers, r)
+		weights = append(weights, 7.0/float64(week.NumDays))
 	}
 
-	return readers, weeks[len(weeks)-1], nil
+	return readers, weights, weeks[len(weeks)-1].Week, nil
 }

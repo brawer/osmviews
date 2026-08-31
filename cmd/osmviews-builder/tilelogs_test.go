@@ -14,12 +14,17 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // A fake HTTP transport that answers the same requests as planet.osm.org.
 type FakeOSMPlanet struct {
 	// If true, return 503 Service Unavailable for all requests.
 	Broken bool
+
+	// Dates ("2567-03-16") for which no daily log file exists; such
+	// requests are answered with 404 Not Found, as planet.osm.org does.
+	MissingDays map[string]bool
 }
 
 func (f *FakeOSMPlanet) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -43,6 +48,15 @@ func (f *FakeOSMPlanet) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 
 	if strings.HasPrefix(url, "https://planet.openstreetmap.org/tile_logs/tiles-2567-03-") {
+		date := strings.TrimSuffix(
+			strings.TrimPrefix(url, "https://planet.openstreetmap.org/tile_logs/tiles-"),
+			".txt.xz")
+		if f.MissingDays[date] {
+			header.Add("Content-Type", "text/html")
+			body := ioutil.NopCloser(bytes.NewBufferString("Not Found"))
+			return &http.Response{StatusCode: 404, Body: body, Header: header}, nil
+		}
+
 		body, err := os.Open("testdata/rapperswil.xz")
 		if err != nil {
 			return nil, err
@@ -57,21 +71,46 @@ func (f *FakeOSMPlanet) RoundTrip(req *http.Request) (*http.Response, error) {
 
 func TestGetAvailableWeeks(t *testing.T) {
 	client := &http.Client{Transport: &FakeOSMPlanet{}}
-	weeks, err := GetAvailableWeeks(client)
+	now := time.Date(2022, 1, 25, 0, 0, 0, 0, time.UTC)
+	weeks, err := GetAvailableWeeks(client, now)
 	if err != nil {
 		t.Error(err)
 		return
 	}
 
-	got := fmt.Sprintf("%s", weeks)
-	if got != "[2021-W52 2022-W01]" {
-		t.Errorf("expected [2021-W52 2022-W01], got %s", got)
+	parts := make([]string, 0, len(weeks))
+	for _, w := range weeks {
+		parts = append(parts, fmt.Sprintf("%s:%d", w.Week, w.NumDays))
+	}
+	got := strings.Join(parts, " ")
+	// 2021-W52 and 2022-W01 have all seven days; the other weeks are
+	// partial. The in-progress week 2022-W03 (no data) and any week that
+	// ended less than a day before `now` are excluded.
+	want := "2015-W03:1 2015-W04:1 2021-W48:1 2021-W51:4 2021-W52:7 2022-W01:7 2022-W02:6"
+	if got != want {
+		t.Errorf("expected %q, got %q", want, got)
+	}
+}
+
+func TestGetAvailableWeeks_SkipsCurrentWeek(t *testing.T) {
+	client := &http.Client{Transport: &FakeOSMPlanet{}}
+	// A `now` inside week 2022-W01: neither W01 (in progress) nor W02/W03
+	// (not started) should be returned.
+	now := time.Date(2022, 1, 5, 12, 0, 0, 0, time.UTC)
+	weeks, err := GetAvailableWeeks(client, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, w := range weeks {
+		if w.Week >= "2022-W01" {
+			t.Errorf("did not expect week %s for now=%s", w.Week, now)
+		}
 	}
 }
 
 func TestGetAvailableWeeksServerError(t *testing.T) {
 	client := &http.Client{Transport: &FakeOSMPlanet{Broken: true}}
-	_, err := GetAvailableWeeks(client)
+	_, err := GetAvailableWeeks(client, time.Now())
 	if !strings.HasPrefix(err.Error(), "failed to fetch") {
 		t.Errorf("expected fetch failure, got %v", err)
 	}
@@ -85,13 +124,14 @@ func TestGetTileLogs(t *testing.T) {
 		return
 	}
 	s := NewFakeStorage()
-	reader, err := GetTileLogs("2567-W12", client, workdir, s)
+	reader, err := GetTileLogs("2567-W12", 7, client, workdir, s)
 	if err != nil {
 		t.Error(err)
 		return
 	}
 
-	// Contents of testdata/rapperswil.xz
+	// Contents of testdata/rapperswil.xz, summed over the seven identical
+	// days that the fake server returns for this week.
 	expected := `14/8593/5747 1421
 15/17186/11494 693
 16/34372/22988 315
@@ -205,6 +245,38 @@ func TestGetTileLogs(t *testing.T) {
 	}
 }
 
+func TestGetTileLogsPartialWeek(t *testing.T) {
+	// Week 2567-W12 is Mon 2567-03-16 .. Sun 2567-03-22. Pretend that
+	// OpenStreetMap only published five of the seven days.
+	client := &http.Client{Transport: &FakeOSMPlanet{MissingDays: map[string]bool{
+		"2567-03-16": true,
+		"2567-03-22": true,
+	}}}
+	workdir, err := ioutil.TempDir("", "tilelogs_test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := NewFakeStorage()
+	reader, err := GetTileLogs("2567-W12", 5, client, workdir, s)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// rapperswil.xz has "14/8593/5747 203" for a single day; summed over
+	// the five days the fake server serves, that is 1015.
+	got := readStream(reader)
+	if !strings.Contains(got, "14/8593/5747 1015\n") {
+		t.Errorf("expected a line \"14/8593/5747 1015\", got:\n%s", got)
+	}
+
+	// The cache object carries the day count so a later run recomputes
+	// the week once more days are published.
+	ctx := context.Background()
+	if _, err := s.Stat(ctx, "osmviews", "internal/osmviews-builder/tilelogs-2567-W12-5d.br"); err != nil {
+		t.Errorf("expected tilelogs-2567-W12-5d.br in storage: %v", err)
+	}
+}
+
 func TestGetTileLogsCachedInStorage(t *testing.T) {
 	ctx := context.Background()
 	workdir, err := ioutil.TempDir("", "tilelogs_test")
@@ -216,7 +288,7 @@ func TestGetTileLogsCachedInStorage(t *testing.T) {
 	if err := s.PutFile(ctx, "osmviews", "internal/osmviews-builder/tilelogs-2042-W08.br", "testdata/tilelogs-2042-W08.br", "application/x-brotli"); err != nil {
 		t.Fatal(err)
 	}
-	reader, err := GetTileLogs("2042-W08", nil, workdir, s)
+	reader, err := GetTileLogs("2042-W08", 7, nil, workdir, s)
 	if err != nil {
 		t.Error(err)
 		return
@@ -237,7 +309,7 @@ func TestGetTileLogsCachedInWorkdir(t *testing.T) {
 	os.WriteFile(path, foo_br, 0644)
 
 	s := NewFakeStorage()
-	reader, err := GetTileLogs("2051-W17", nil, workdir, s)
+	reader, err := GetTileLogs("2051-W17", 7, nil, workdir, s)
 	if err != nil {
 		t.Error(err)
 		return

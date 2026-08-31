@@ -144,7 +144,10 @@ func NewPainter(path string, numWeeks int, zoom uint8) (*Painter, error) {
 
 // Paint produces a GeoTIFF file from a set of weekly tile view counts.
 // Tile views at zoom level `zoom` become one pixel in the output GeoTIFF.
-func paint(path string, zoom uint8, tilecounts []io.Reader, ctx context.Context) error {
+// weights[i] scales the counts of tilecounts[i] so that a week with only
+// some of its seven days of logs is extrapolated to a full week; a nil
+// weights slice means a factor of 1.0 for every week.
+func paint(path string, zoom uint8, tilecounts []io.Reader, weights []float64, ctx context.Context) error {
 	logger := log.Default()
 	logger.Printf("starting to paint GeoTIFF, path=%s, zoom=%d", path, zoom)
 
@@ -157,7 +160,7 @@ func paint(path string, zoom uint8, tilecounts []io.Reader, ctx context.Context)
 	}
 	g, subCtx := errgroup.WithContext(ctx)
 	g.Go(func() error {
-		return mergeTileCounts(tilecounts, ch, subCtx)
+		return mergeTileCounts(tilecounts, weights, ch, subCtx)
 	})
 	g.Go(func() error {
 		tile := WorldTile

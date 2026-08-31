@@ -61,6 +61,41 @@ func TestMergeTileCounts(t *testing.T) {
 	}
 }
 
+func TestMergeTileCounts_Weights(t *testing.T) {
+	readers := []io.Reader{
+		strings.NewReader("7/1/1 100\n7/2/2 30\n"), // full week, weight 1.0
+		strings.NewReader("7/1/1 10\n7/3/3 7\n"),   // 2 of 7 days, weight 3.5
+	}
+	result := make([]TileCount, 0, 4)
+	ch := make(chan TileCount, 1)
+	g, ctx := errgroup.WithContext(context.Background())
+	g.Go(func() error {
+		return mergeTileCounts(readers, []float64{1.0, 3.5}, ch, ctx)
+	})
+	g.Go(func() error {
+		for tc := range ch {
+			result = append(result, tc)
+		}
+		return nil
+	})
+	if err := g.Wait(); err != nil {
+		t.Fatal(err)
+	}
+
+	got := make(map[string]uint64, len(result))
+	for _, tc := range result {
+		got[tc.Key.String()] += tc.Count
+	}
+	want := map[string]uint64{
+		"7/1/1": 100 + 35, // 10 * 3.5, rounded
+		"7/2/2": 30,
+		"7/3/3": 25, // 7 * 3.5 = 24.5, rounded to 25
+	}
+	if fmt.Sprintf("%v", got) != fmt.Sprintf("%v", want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
 // Helper for testing mergeTileCounts().
 func readMerged(readers []io.Reader) ([]TileCount, error) {
 	result := make([]TileCount, 0, 10000)
@@ -68,7 +103,7 @@ func readMerged(readers []io.Reader) ([]TileCount, error) {
 	ch := make(chan TileCount, 1)
 	g, ctx := errgroup.WithContext(context.Background())
 	g.Go(func() error {
-		return mergeTileCounts(readers, ch, ctx)
+		return mergeTileCounts(readers, nil, ch, ctx)
 	})
 	g.Go(func() error {
 		for t := range ch {
