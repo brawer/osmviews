@@ -89,7 +89,6 @@ func (p *Painter) setupRaster(tile TileKey) (*Raster, error) {
 	}
 
 	p.raster = NewRaster(rasterTile, p.raster)
-	//fmt.Printf("final rasterTile=%s tile=%s\n", rasterTile, tile)
 	return p.raster, nil
 }
 

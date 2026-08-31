@@ -6,6 +6,7 @@ package main
 import (
 	"context"
 	"encoding/base32"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -51,6 +52,13 @@ func NewStorage(workdir string) (*Storage, error) {
 	config.Endpoint = os.Getenv("S3_ENDPOINT")
 	config.Key = os.Getenv("S3_KEY")
 	config.Secret = os.Getenv("S3_SECRET")
+	for name, value := range map[string]string{
+		"S3_ENDPOINT": config.Endpoint, "S3_KEY": config.Key, "S3_SECRET": config.Secret,
+	} {
+		if value == "" {
+			return nil, fmt.Errorf("environment variable %s is not set", name)
+		}
+	}
 
 	client, err := minio.New(config.Endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(config.Key, config.Secret, ""),
@@ -158,9 +166,7 @@ func (s *Storage) Reload(ctx context.Context) error {
 			return err
 		}
 		if !live[fp] {
-			msg := fmt.Sprintf("Deleting obsolete local file: %s\n", fp)
-			log.Println(msg)
-			fmt.Println(msg)
+			log.Printf("deleting obsolete local file: %s", fp)
 			if err := os.Remove(fp); err != nil {
 				return err
 			}
@@ -207,18 +213,22 @@ func (c *Content) Close() error {
 	return c.f.Close()
 }
 
+// ErrNotFound is returned by Retrieve when no servable file matches.
+// A different error means the file is known but could not be read.
+var ErrNotFound = errors.New("not found")
+
 func (s *Storage) Retrieve(filename string) (*Content, error) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
 	loc, found := s.files[filename]
 	if !found {
-		return nil, fmt.Errorf("not found")
+		return nil, ErrNotFound
 	}
 
 	f, err := os.Open(loc.Path)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("opening cached %s: %w", filename, err)
 	}
 
 	c := &Content{

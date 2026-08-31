@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -114,6 +115,23 @@ func TestStorage_Retrieve(t *testing.T) {
 
 	if err := c.Close(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestStorage_RetrieveErrors(t *testing.T) {
+	storage := &Storage{
+		client:  &fakeStorageClient{},
+		workdir: t.TempDir(),
+		files:   make(map[string]*localFile, 10),
+	}
+	// Known to storage, but the cached file is missing from disk.
+	storage.files["gone.txt"] = &localFile{Path: filepath.Join(storage.workdir, "gone.txt")}
+
+	if _, err := storage.Retrieve("unknown.txt"); !errors.Is(err, ErrNotFound) {
+		t.Errorf("unknown file: got %v, want ErrNotFound", err)
+	}
+	if _, err := storage.Retrieve("gone.txt"); err == nil || errors.Is(err, ErrNotFound) {
+		t.Errorf("missing cache file: got %v, want a non-ErrNotFound error", err)
 	}
 }
 

@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -56,8 +57,9 @@ func main() {
 	http.Handle("/metrics", promhttp.Handler())
 	http.HandleFunc("/download/", server.HandleDownload)
 	log.Printf("Listening for HTTP requests on port %d", *port)
-	http.ListenAndServe(":"+strconv.Itoa(*port), nil)
+	err = http.ListenAndServe(":"+strconv.Itoa(*port), nil)
 	cancel()
+	log.Fatalf("HTTP server stopped: %v", err)
 }
 
 type Webserver struct {
@@ -151,6 +153,9 @@ func (ws *Webserver) HandleDownload(w http.ResponseWriter, req *http.Request) {
 	path := strings.TrimPrefix(req.URL.Path, "/download/")
 	c, err := ws.storage.Retrieve(path)
 	if err != nil {
+		if !errors.Is(err, ErrNotFound) {
+			log.Printf("serving /download/%s: %v", path, err)
+		}
 		http.NotFound(w, req)
 		return
 	}
