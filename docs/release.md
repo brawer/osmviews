@@ -5,47 +5,60 @@ SPDX-License-Identifier: MIT
 
 # Release
 
-Release automation is blocked on
-[T380127](https://phabricator.wikimedia.org/T380127) and
-[T194332](https://phabricator.wikimedia.org/T194332). Meanwhile,
-we have a manual release process, which is not great.
+Releases deploy automatically. To cut one:
+
+```sh
+git switch main && git pull
+git tag X.Y.Z            # matching the existing 0.0.x scheme
+git push origin X.Y.Z
+```
+
+Pushing the tag triggers CI (`.github/workflows/build-test.yml`). After the
+build and tests pass, the `deploy` job calls the Toolforge components API,
+which rebuilds the image from `main` and recreates both components — the
+`webserver` and the daily `osmviews-builder` job (see
+[`toolforge.yaml`](../toolforge.yaml)). Watch it at
+<https://github.com/brawer/osmviews/actions>.
+
+**Do not merge anything to `main` until the deploy job finishes.** The
+deployment builds `main` at `HEAD` (`toolforge.yaml` pins `ref: main`), so
+`main` must still point at the tagged commit when the build runs.
+
+## Verify
+
+```sh
+# Server header carries the deployed revision:
+curl -sI https://osmviews.toolforge.org/ | grep -i '^server:'
+# → OSMViews/git-<commit>, where <commit> is the tagged commit
+git tag --points-at "$(curl -sI https://osmviews.toolforge.org/ \
+  | sed -n 's#.*OSMViews/git-##p' | tr -d '\r')"
+
+# The daily job produces a fresh GeoTIFF within a day:
+curl -sI https://osmviews.toolforge.org/download/osmviews.tiff | grep -i last-modified
+```
+
+The buildpack build does not pass linker flags, so the `Software` GeoTIFF
+tag and the `Server` header read `OSMViews/git-<commit>` rather than the
+tag; the commit is what carries the tag.
+
+## If the automatic deploy fails
+
+Deploy from the bastion by hand:
 
 ```sh
 ssh login.toolforge.org
 become osmviews
-toolforge build start --use-latest-versions https://github.com/brawer/osmviews.git
-toolforge webservice --mount=none buildservice restart
-toolforge jobs flush
-toolforge jobs run --image tool-osmviews/tool-osmviews:latest --mem 3G --cpu 2 --mount none --schedule @daily --command osmviews-builder osmviews-builder
+toolforge components deployment create --description "release X.Y.Z"
 ```
 
-## Version stamping
+`toolforge components config show` prints the currently registered config;
+`toolforge components config create toolforge.yaml` re-registers it from a
+local copy of the file if it has drifted.
 
-`osmviews-builder` writes its version into the `Software` tag of every
-output GeoTIFF, and `webserver` returns it in the `Server` HTTP header.
+## Changing the deployment shape
 
-If the buildpack keeps the `.git` directory, both binaries fill this in
-from the source revision automatically (`OSMViews/git-<commit>`). To
-embed a proper release tag instead, tag the commit and tell the build
-service to pass a linker flag, e.g.:
-
-```sh
-# in a local checkout
-git tag 0.0.8 && git push origin 0.0.8
-
-# on Toolforge, before `toolforge build start`
-toolforge envvars create GO_LINKER_SYMBOL main.SoftwareVersion
-toolforge envvars create GO_LINKER_VALUE  OSMViews/0.0.8
-```
-
-(`GO_LINKER_SYMBOL` / `GO_LINKER_VALUE` set a single symbol; the webserver
-build uses `main.ServerVersion`. Check the current buildpack docs — newer
-ones take `BP_GO_BUILD_LDFLAGS` with full `-ldflags` instead.)
-
-After deploying, verify what landed:
-
-```sh
-toolforge jobs run --image tool-osmviews/tool-osmviews:latest --mount none \
-  --command 'osmviews-builder --version' check-version
-toolforge jobs logs check-version
-```
+Component resources, the schedule, the health check, and so on live in
+[`toolforge.yaml`](../toolforge.yaml). Because it declares
+`source_url: …/main/toolforge.yaml`, the components API re-fetches it from
+GitHub on every deployment, so a merged change to that file takes effect on
+the next release with no bastion step.
