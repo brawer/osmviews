@@ -50,7 +50,7 @@ among others, by the OpenStreetMap Foundation.
 
 The goal is to convert a rolling window of such logs (for example, the most
 recent 52 weekly periods) into a geospatial raster in which each cell holds an
-aggregated, area-normalised "view density" for the corresponding location, at
+aggregated, area-normalised “view density” for the corresponding location, at
 a spatial resolution equivalent to zoom level 18 — roughly 150 m per cell at
 the equator — with coverage of the entire globe, and delivered as a
 Cloud-Optimized GeoTIFF (COG) so that clients can read arbitrary sub-regions
@@ -75,11 +75,11 @@ dimensions of the grid.
 
 1. Encode each `zoom/x/y` tile as an integer *tile key* whose numeric order is
    a depth-first pre-order traversal of the tile quad-tree (§3.1).
-2. For each time period, sort that period's records by tile key using an
+2. For each time period, sort that period’s records by tile key using an
    external (disk-backed) sort, and coalesce equal keys; store the sorted,
    coalesced period as a compressed file (§3.2).
 3. Merge the sorted period files with a streaming k-way merge, so that a single
-   globally key-ordered record stream is produced, in which every period's
+   globally key-ordered record stream is produced, in which every period’s
    records for a given tile arrive consecutively (§3.2).
 4. Consume that stream. For each tile, collect its per-period values and reduce
    them to one aggregated value with a robust statistic that tolerates missing
@@ -119,12 +119,12 @@ This is an interleaving (Z-order / Morton) code with two properties that the
 method depends on:
 
 * **Numeric order equals pre-order traversal.** For two keys, the comparison
-  proceeds level by level from the root. A tile's key is numerically smaller
+  proceeds level by level from the root. A tile’s key is numerically smaller
   than the keys of all tiles strictly inside it, and an entire sub-tree
   occupies one contiguous key interval. Sorting keys ascending therefore
   yields a depth-first, pre-order enumeration of the quad-tree.
-* **Cheap tree operations.** "Is tile A an ancestor of tile B", "truncate B to
-  level *k*", and "successor of A in pre-order at maximum level *m*" are all
+* **Cheap tree operations.** “Is tile A an ancestor of tile B”, “truncate B to
+  level *k*”, and “successor of A in pre-order at maximum level *m*” are all
   constant-time bit manipulations of the key.
 
 Embedding the level in the key (rather than keying only on `x`, `y` at a fixed
@@ -135,14 +135,14 @@ many zoom levels — sortable into a single valid traversal.
 level bits may occupy the high end instead of the low end; a Hilbert-curve
 ordering may be substituted where its locality is preferred and the ancestor
 test is adjusted; trees of branching factor other than four (e.g. binary
-"tile pyramids", octrees for volumetric data) generalise directly by changing
+“tile pyramids”, octrees for volumetric data) generalise directly by changing
 the bits-per-level.
 
 ### 3.2 Two-stage ordering: per-period external sort, cross-period streaming merge
 
 **Per period.** The records of one period are parsed to `(tile key, count)`
 pairs and fed to an external sort keyed on the tile key, which spills runs to
-temporary files and merges them, so that peak memory is bounded by the sort's
+temporary files and merges them, so that peak memory is bounded by the sort’s
 configured buffer regardless of the number of distinct tiles. The sorted
 output is streamed once more to coalesce equal keys (a tile requested on
 several days of the period becomes one record with the summed count) and
@@ -181,7 +181,7 @@ tile-key ties by ascending count, the buffered present values already arrive
 sorted, so no per-cell sort is needed. The median suppresses transient spikes,
 seasonality, and the occasional noisy weighted period.
 
-The reduced value is then divided by the tile's true surface area (which, in
+The reduced value is then divided by the tile’s true surface area (which, in
 web-Mercator, varies with latitude) to obtain an area-normalised density.
 
 *Variations.* Any order statistic (a different quantile, trimmed mean),
@@ -215,7 +215,7 @@ those raster tiles are *final*. The consumer:
 Consequently the peak live raster memory is `(L + 1) · T² · sizeof(cell)` —
 for `L = 10`, `T = 256`, four-byte cells, about 2.8 MiB — **independent of how
 many cells the planet has**. Peak process memory in a worked implementation is
-a few hundred MiB, dominated by language-runtime overhead, the compressor's
+a few hundred MiB, dominated by language-runtime overhead, the compressor’s
 buffers, and one buffered input period, not by the raster.
 
 Regions never mentioned by any record are emitted as uniform raster tiles
@@ -234,7 +234,7 @@ full-resolution data.
 
 ### 3.6 Output-size reduction
 
-Three techniques act together so that the file size tracks the data's
+Three techniques act together so that the file size tracks the data’s
 information content rather than the grid dimensions.
 
 #### 3.6.1 Magnitude quantisation
@@ -253,12 +253,12 @@ Maintain, per pyramid level, a map from *tile body content* (in practice, from
 the rounded uniform value for uniform tiles, and optionally from a hash for
 non-uniform tiles) to the file offset and length at which a tile with that
 content was first written. When a later tile has content already in the map,
-**do not write its body again**: instead set its entry in the format's
+**do not write its body again**: instead set its entry in the format’s
 tile-offset and tile-bytecount arrays to point at the *same* byte range as the
 earlier tile.
 
 The result is that each pyramid level of the file stores exactly one
-compressed body for "all-zero", one for "all-one", and so on, and the hundreds
+compressed body for “all-zero”, one for “all-one”, and so on, and the hundreds
 of thousands of ocean tiles at that level all reference it. Multiple image
 tiles resolving to one shared byte range is unusual — most encoders never do
 it — but it is permitted by the TIFF 6.0 specification (the `TileOffsets` and
@@ -266,7 +266,7 @@ it — but it is permitted by the TIFF 6.0 specification (the `TileOffsets` and
 requires them to be distinct or monotone), and mainstream readers (e.g. GDAL,
 `tifffile`, browser GeoTIFF libraries) decode it correctly.
 
-A corollary: the file's structural metadata must **not** advertise a strict
+A corollary: the file’s structural metadata must **not** advertise a strict
 tile ordering or contiguous tile layout (for COGs, the `BLOCK_ORDER` ghost
 option is deliberately omitted), because such a declaration would forbid
 tiles sharing bytes.
@@ -276,25 +276,25 @@ tiles sharing bytes.
 Cell values are stored as a fixed monotone transform of the density, for
 example `ln(1 + density)`. This preserves the ordering of cells (so any
 threshold or ranking is unchanged) while compressing a very skewed dynamic
-range (e.g. `0 … 2.3 × 10⁵`) into a near-linear small range (e.g. `0 … 12`),
+range (e.g. roughly `0` to `2.3 × 10⁵`) into a near-linear small range (e.g. `0` to `12`),
 which improves both the compressibility of tile bodies and the out-of-the-box
-behaviour of visualisation tools. The transform's maximum over the raster is
+behaviour of visualisation tools. The transform’s maximum over the raster is
 recorded in a standard tag so that consumers can invert or re-normalise it.
 
 ### 3.7 Cloud-Optimized GeoTIFF assembly
 
 A COG requires the image file directories (IFDs), and a small block of
-structural "ghost" metadata, to precede the tile data, so that one HTTP range
+structural “ghost” metadata, to precede the tile data, so that one HTTP range
 request for the header locates every tile. But the tile offsets are not known
 until the tiles have been written. The method therefore:
 
 1. streams compressed tile bodies to a temporary file during the pass (§3.4),
-   recording each body's provisional offset within that file and its length;
+   recording each body’s provisional offset within that file and its length;
 2. writes the file header, the ghost metadata, and all IFDs (full-resolution
    level and every overview level), with placeholder tile-offset values;
 3. appends the tile bodies from the temporary file, now at their final
    absolute offsets;
-4. seeks back and patches every tile-offset (and the inter-IFD "next IFD"
+4. seeks back and patches every tile-offset (and the inter-IFD “next IFD”
    pointers) to the final values.
 
 Classic (32-bit) TIFF is sufficient because the output stays below 4 GiB
@@ -391,11 +391,11 @@ alone and in combination:
 8. Quantising raster tiles to a common value at storage precision so that
    large low-magnitude regions collapse to identical tiles.
 9. Deduplicating identical raster tiles by setting multiple entries of the
-   container's tile-offset / tile-length index to point at a single shared
+   container’s tile-offset / tile-length index to point at a single shared
    byte range, and correspondingly omitting any strict-tile-order declaration
-   from the container's structural metadata.
+   from the container’s structural metadata.
 10. Storing a monotone transform of the cell value to compress dynamic range
-    while preserving order, with the transform's extent recorded in metadata.
+    while preserving order, with the transform’s extent recorded in metadata.
 11. Assembling a header-first (Cloud-Optimized) GeoTIFF by staging tile bodies
     in a temporary file and back-patching offsets after the single pass.
 12. The combination of 1–11 to build a globally complete, high-zoom,
