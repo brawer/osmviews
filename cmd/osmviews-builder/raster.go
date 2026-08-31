@@ -13,7 +13,21 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"time"
 )
+
+// TiffMetadata is provenance information written into the main image file
+// directory of the output GeoTIFF.
+type TiffMetadata struct {
+	// Description is stored in the ImageDescription tag (270). If empty,
+	// a generic default is used.
+	Description string
+
+	// DateTime is stored in the DateTime tag (306); we use the date of
+	// the most recent ingested tile log so that a downloaded file carries
+	// its own data currency. If zero, the tag is omitted.
+	DateTime time.Time
+}
 
 // Name of the producing software to embed in output TIFF files.
 // When a release is cut, our replease script passes a flag to
@@ -111,6 +125,8 @@ type RasterWriter struct {
 	dataSize     uint64
 	zoom         uint8
 	maxValue     float32
+	description  string    // ImageDescription tag (270)
+	dateTime     time.Time // DateTime tag (306); omitted if zero
 
 	// For each zoom level, tileOffsets is the position of the TileOffset
 	// relative to the start of the temporary file. In the final output,
@@ -128,7 +144,7 @@ type RasterWriter struct {
 	tileByteCountsPos []int64
 }
 
-func NewRasterWriter(path string, zoom uint8) (*RasterWriter, error) {
+func NewRasterWriter(path string, zoom uint8, meta TiffMetadata) (*RasterWriter, error) {
 	tempFile, err := os.CreateTemp("", "*.tmp")
 	if err != nil {
 		return nil, err
@@ -138,6 +154,8 @@ func NewRasterWriter(path string, zoom uint8) (*RasterWriter, error) {
 		path:              path,
 		tempFile:          tempFile,
 		zoom:              zoom,
+		description:       meta.Description,
+		dateTime:          meta.DateTime,
 		tileOffsets:       make([][]uint32, zoom+1),
 		tileByteCounts:    make([][]uint32, zoom+1),
 		uniformTiles:      make([]map[uint32]int, zoom+1),
@@ -365,6 +383,7 @@ func (w *RasterWriter) writeIFD(zoom uint8, f *os.File) error {
 		samplesPerPixel  = 277
 		planarConfig     = 284
 		software         = 305
+		dateTime         = 306
 		tileWidth        = 322
 		tileLength       = 323
 		tileOffsets      = 324
@@ -440,6 +459,9 @@ func (w *RasterWriter) writeIFD(zoom uint8, f *os.File) error {
 	if zoom == w.zoom {
 		ifd = append(ifd, ifdEntry{imageDescription, 0})
 		ifd = append(ifd, ifdEntry{software, 0})
+		if !w.dateTime.IsZero() {
+			ifd = append(ifd, ifdEntry{dateTime, 0})
+		}
 		ifd = append(ifd, ifdEntry{modelPixelScale, 0})
 		ifd = append(ifd, ifdEntry{modelTiepoint, 0})
 		ifd = append(ifd, ifdEntry{geoKeyDirectory, 0})
@@ -461,6 +483,17 @@ func (w *RasterWriter) writeIFD(zoom uint8, f *os.File) error {
 	var buf, extraBuf bytes.Buffer
 	if err := binary.Write(&buf, binary.LittleEndian, uint16(len(ifd))); err != nil {
 		return err
+	}
+
+	// writeASCII appends s and a terminating NUL to extraBuf and returns the
+	// (type, count, value) fields for an ASCII IFD entry pointing at it. It
+	// must be called in the order the entries are written, because the value
+	// is the string's offset within the final file.
+	writeASCII := func(s string) (typ uint16, count, value uint32) {
+		value = uint32(extraPos) + uint32(extraBuf.Len())
+		extraBuf.WriteString(s)
+		extraBuf.WriteByte(0)
+		return asciiFormat, uint32(len(s) + 1), value
 	}
 
 	lastTag := uint16(0)
@@ -486,19 +519,18 @@ func (w *RasterWriter) writeIFD(zoom uint8, f *os.File) error {
 			typ, count, value = longFormat, 1, e.val
 
 		case imageDescription:
-			s := []byte("OpenStreetMap view density, in weekly user views per km2\u0000")
-			typ, count, value = asciiFormat, uint32(len(s)), uint32(extraPos)+uint32(extraBuf.Len())
-			if _, err := extraBuf.Write(s); err != nil {
-				return err
+			desc := w.description
+			if desc == "" {
+				desc = "OpenStreetMap view density, in weekly user views per km2"
 			}
+			typ, count, value = writeASCII(desc)
+
+		case dateTime:
+			// TIFF 6.0: "YYYY:MM:DD HH:MM:SS", 20 bytes including the NUL.
+			typ, count, value = writeASCII(w.dateTime.UTC().Format("2006:01:02 15:04:05"))
 
 		case software:
-			var softwareBuf bytes.Buffer
-			softwareBuf.WriteString(SoftwareVersion)
-			softwareBuf.WriteByte(0)
-			s := softwareBuf.Bytes()
-			typ, count, value = asciiFormat, uint32(len(s)), uint32(extraPos)+uint32(extraBuf.Len())
-			extraBuf.Write(s)
+			typ, count, value = writeASCII(SoftwareVersion)
 
 		case sMinSampleValue:
 			typ, count = floatFormat, 1

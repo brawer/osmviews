@@ -130,8 +130,8 @@ func (p *Painter) emitRaster() error {
 	return p.writer.Write(raster)
 }
 
-func NewPainter(path string, numWeeks int, zoom uint8) (*Painter, error) {
-	writer, err := NewRasterWriter(path, zoom-8)
+func NewPainter(path string, numWeeks int, zoom uint8, meta TiffMetadata) (*Painter, error) {
+	writer, err := NewRasterWriter(path, zoom-8, meta)
 	if err != nil {
 		return nil, err
 	}
@@ -146,8 +146,9 @@ func NewPainter(path string, numWeeks int, zoom uint8) (*Painter, error) {
 // Tile views at zoom level `zoom` become one pixel in the output GeoTIFF.
 // weights[i] scales the counts of tilecounts[i] so that a week with only
 // some of its seven days of logs is extrapolated to a full week; a nil
-// weights slice means a factor of 1.0 for every week.
-func paint(path string, zoom uint8, tilecounts []io.Reader, weights []float64, ctx context.Context) error {
+// weights slice means a factor of 1.0 for every week. meta is provenance
+// written into the GeoTIFF's tags.
+func paint(path string, zoom uint8, tilecounts []io.Reader, weights []float64, meta TiffMetadata, ctx context.Context) error {
 	logger := log.Default()
 	logger.Printf("starting to paint GeoTIFF, path=%s, zoom=%d", path, zoom)
 	start := time.Now()
@@ -155,7 +156,7 @@ func paint(path string, zoom uint8, tilecounts []io.Reader, weights []float64, c
 	// One goroutine is decompressing, parsing and merging the weekly counts;
 	// another is painting the image from data that gets sent over a channel.
 	ch := make(chan TileCount, 100000)
-	painter, err := NewPainter(path, len(tilecounts), zoom)
+	painter, err := NewPainter(path, len(tilecounts), zoom, meta)
 	if err != nil {
 		return err
 	}
