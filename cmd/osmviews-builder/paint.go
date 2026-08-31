@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"time"
 
 	"golang.org/x/sync/errgroup"
 )
@@ -150,6 +151,7 @@ func NewPainter(path string, numWeeks int, zoom uint8) (*Painter, error) {
 func paint(path string, zoom uint8, tilecounts []io.Reader, weights []float64, ctx context.Context) error {
 	logger := log.Default()
 	logger.Printf("starting to paint GeoTIFF, path=%s, zoom=%d", path, zoom)
+	start := time.Now()
 
 	// One goroutine is decompressing, parsing and merging the weekly counts;
 	// another is painting the image from data that gets sent over a channel.
@@ -166,16 +168,23 @@ func paint(path string, zoom uint8, tilecounts []io.Reader, weights []float64, c
 		tile := WorldTile
 		counts := make([]uint64, len(tilecounts))
 		numCounts := 0 // number of counts for the same tile
+		painted := 0
+		progress := time.NewTicker(30 * time.Second)
+		defer progress.Stop()
 		for {
 			select {
 			case <-subCtx.Done():
 				return subCtx.Err()
+			case <-progress.C:
+				logger.Printf("painting: %d tiles so far, %s elapsed",
+					painted, time.Since(start).Round(time.Second))
 			case c, more := <-ch:
 				if c.Key != tile {
 					if numCounts > 0 {
 						if err := painter.Paint(tile, counts[:numCounts]); err != nil {
 							return err
 						}
+						painted++
 					}
 					numCounts = 0
 					tile = c.Key
@@ -194,7 +203,9 @@ func paint(path string, zoom uint8, tilecounts []io.Reader, weights []float64, c
 						if err := painter.Paint(tile, counts[:numCounts]); err != nil {
 							return err
 						}
+						painted++
 					}
+					logger.Printf("painted %d tiles from weekly counts", painted)
 					return nil
 				}
 			}
@@ -206,5 +217,6 @@ func paint(path string, zoom uint8, tilecounts []io.Reader, weights []float64, c
 	if err := painter.Close(); err != nil {
 		return err
 	}
+	logger.Printf("finished painting %s in %s", path, time.Since(start).Round(time.Second))
 	return nil
 }

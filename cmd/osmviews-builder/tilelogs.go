@@ -312,6 +312,7 @@ func fetchTileLogs(day time.Time, client *http.Client, ch chan<- extsort.SortTyp
 		return err
 	}
 
+	var lines, unparseable, sent int
 	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
 		// Check if our task has been canceled. Typically this can happen
@@ -322,11 +323,35 @@ func fetchTileLogs(day time.Time, client *http.Client, ch chan<- extsort.SortTyp
 		default:
 		}
 
-		if tc := ParseTileCount(scanner.Text()); tc.Count > 0 {
+		lines++
+		tc := ParseTileCount(scanner.Text())
+		if tc.Key == NoTile {
+			unparseable++
+			continue
+		}
+		if tc.Count > 0 {
 			ch <- tc
+			sent++
 		}
 	}
-	return scanner.Err()
+	if err := scanner.Err(); err != nil {
+		return err
+	}
+
+	// A sudden change in the tile-log format would show up here as every
+	// line failing to parse rather than as an error, so make some noise.
+	date := day.Format("2006-01-02")
+	switch {
+	case lines == 0:
+		log.Default().Printf("warning: tile log for %s is empty", date)
+	case sent == 0:
+		log.Default().Printf("warning: tile log for %s yielded no usable records (%d lines, %d unparseable)",
+			date, lines, unparseable)
+	case unparseable*20 > lines: // more than 5%
+		log.Default().Printf("warning: tile log for %s: %d of %d lines did not parse; has the format changed?",
+			date, unparseable, lines)
+	}
+	return nil
 }
 
 // fetchTileLogFile downloads one daily tile-log file and returns its raw,
@@ -360,7 +385,7 @@ func fetchTileLogFile(ctx context.Context, client *http.Client, url string) ([]b
 			return nil, err
 		}
 	}
-	return nil, lastErr
+	return nil, fmt.Errorf("giving up on %s after %d attempts: %w", url, fetchPolicy.Attempts, lastErr)
 }
 
 // fetchOnce performs a single GET, bounded by fetchPolicy.Timeout. A nil

@@ -27,17 +27,17 @@ func main() {
 
 	if *workdir != "" {
 		if err := os.MkdirAll(*workdir, 0755); err != nil {
-			logger.Fatal(err)
+			logger.Fatalf("creating workdir %s: %v", *workdir, err)
 		}
 	}
 
 	storage, err := NewStorage()
 	if err != nil {
-		logger.Fatal(err)
+		logger.Fatalf("connecting to object storage: %v", err)
 	}
 	bucketExists, err := storage.BucketExists(ctx, "osmviews")
 	if err != nil {
-		logger.Fatal(err)
+		logger.Fatalf("checking for bucket \"osmviews\": %v", err)
 	}
 	if !bucketExists {
 		logger.Fatal("storage bucket \"osmviews\" does not exist")
@@ -46,7 +46,7 @@ func main() {
 	maxWeeks := 52 // 1 year
 	tilecounts, weights, lastWeek, err := fetchWeeklyLogs(*workdir, storage, maxWeeks)
 	if err != nil {
-		logger.Fatal(err)
+		logger.Fatalf("fetching weekly tile logs: %v", err)
 	}
 
 	// Construct a file path for the output file. As part of the file name,
@@ -55,7 +55,7 @@ func main() {
 	// convention involving ISO weeks, which are less commonly known.
 	year, week, err := ParseWeek(lastWeek)
 	if err != nil {
-		logger.Fatal(err)
+		logger.Fatalf("parsing last week %q: %v", lastWeek, err)
 	}
 	lastDay := weekStart(year, week).AddDate(0, 0, 6)
 	date := lastDay.Format("20060102")
@@ -75,38 +75,34 @@ func main() {
 		_, err = storage.Stat(ctx, bucket, remoteStatsPath)
 		hasStats := err == nil
 		if hasGeoTiff && hasStats {
-			msg := fmt.Sprintf("Already in storage: %s/%s and %s/%s", bucket, remotepath, bucket, remoteStatsPath)
-			logger.Println(msg)
+			logger.Printf("already in storage: %s/%s and %s/%s; nothing to do",
+				bucket, remotepath, bucket, remoteStatsPath)
 			return
 		}
 	}
 
 	// Paint the output GeoTIFF file.
 	if err := paint(localpath, 18, tilecounts, weights, ctx); err != nil {
-		logger.Fatal(err)
+		logger.Fatalf("painting %s: %v", localpath, err)
 	}
 
+	logger.Printf("computing statistics from %s", localpath)
 	if err := BuildStats(localpath, localStatsPath, localStatsPlotPath); err != nil {
-		logger.Fatal(err)
+		logger.Fatalf("computing statistics: %v", err)
 	}
 
 	// Upload the output file to storage, and garbage-collect old files.
 	if storage != nil {
-		err := storage.PutFile(ctx, bucket, remotepath, localpath, "image/tiff")
-		if err != nil {
-			logger.Fatal(err)
+		if err := storage.PutFile(ctx, bucket, remotepath, localpath, "image/tiff"); err != nil {
+			logger.Fatalf("uploading %s/%s: %v", bucket, remotepath, err)
 		}
-
-		err = storage.PutFile(ctx, bucket, remoteStatsPath, localStatsPath, "application/json")
-		if err != nil {
-			logger.Fatal(err)
+		if err := storage.PutFile(ctx, bucket, remoteStatsPath, localStatsPath, "application/json"); err != nil {
+			logger.Fatalf("uploading %s/%s: %v", bucket, remoteStatsPath, err)
 		}
-
-		msg := fmt.Sprintf("Uploaded to storage: %s/%s and %s/%s\n", bucket, remotepath, bucket, remoteStatsPath)
-		logger.Println(msg)
+		logger.Printf("uploaded %s/%s and %s/%s", bucket, remotepath, bucket, remoteStatsPath)
 
 		if err := Cleanup(storage); err != nil {
-			logger.Fatal(err)
+			logger.Fatalf("garbage-collecting old files in storage: %v", err)
 		}
 	}
 }
@@ -162,16 +158,26 @@ func fetchWeeklyLogs(workdir string, storage Storage, maxWeeks int) ([]io.Reader
 		weeks = weeks[len(weeks)-maxWeeks:]
 	}
 
+	partial, fewestDays := 0, 7
+	for _, w := range weeks {
+		if w.NumDays < 7 {
+			partial++
+		}
+		if w.NumDays < fewestDays {
+			fewestDays = w.NumDays
+		}
+	}
 	logger.Printf(
-		"found %d weeks with OpenStreetMap tile logs, from %s to %s",
-		len(weeks), weeks[0].Week, weeks[len(weeks)-1].Week)
+		"found %d weeks with OpenStreetMap tile logs, from %s to %s; "+
+			"%d are partial (fewest %d/7 days), their counts are scaled up to a full week",
+		len(weeks), weeks[0].Week, weeks[len(weeks)-1].Week, partial, fewestDays)
 
 	readers := make([]io.Reader, 0, len(weeks))
 	weights := make([]float64, 0, len(weeks))
 	for _, week := range weeks {
 		r, err := GetTileLogs(week.Week, week.NumDays, client, workdir, storage)
 		if err != nil {
-			return nil, nil, "", err
+			return nil, nil, "", fmt.Errorf("week %s: %w", week.Week, err)
 		}
 		readers = append(readers, r)
 		weights = append(weights, 7.0/float64(week.NumDays))
