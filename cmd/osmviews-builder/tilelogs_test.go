@@ -90,6 +90,14 @@ func TestGetAvailableWeeks(t *testing.T) {
 	if got != want {
 		t.Errorf("expected %q, got %q", want, got)
 	}
+
+	last := weeks[len(weeks)-1] // 2022-W02, days present Mon 10th .. Sat 15th
+	if f := last.FirstDay.Format("2006-01-02"); f != "2022-01-10" {
+		t.Errorf("2022-W02 FirstDay = %s, want 2022-01-10", f)
+	}
+	if l := last.LastDay.Format("2006-01-02"); l != "2022-01-15" {
+		t.Errorf("2022-W02 LastDay = %s, want 2022-01-15", l)
+	}
 }
 
 func TestGetAvailableWeeks_SkipsCurrentWeek(t *testing.T) {

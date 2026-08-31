@@ -19,6 +19,8 @@ type TiffReader struct {
 	imageWidth, imageHeight, tileWidth, tileHeight uint32
 	tileOffsets, tileByteCounts                    []uint32
 	maxValue                                       float32
+	imageDescription                               string // TIFF tag 270
+	dateTime                                       string // TIFF tag 306
 }
 
 func NewTiffReader(r io.ReaderAt) (*TiffReader, error) {
@@ -91,6 +93,20 @@ func (t *TiffReader) readFirstIFD() error {
 		}
 
 		switch tag {
+		case 270: // ImageDescription
+			if s, err := t.readASCII(count, value); err == nil {
+				t.imageDescription = s
+			} else {
+				return err
+			}
+
+		case 306: // DateTime
+			if s, err := t.readASCII(count, value); err == nil {
+				t.dateTime = s
+			} else {
+				return err
+			}
+
 		case 256: // ImageWidth
 			t.imageWidth = value
 
@@ -123,6 +139,24 @@ func (t *TiffReader) readFirstIFD() error {
 	}
 
 	return nil
+}
+
+// readASCII reads a NUL-terminated ASCII TIFF tag value. Short values
+// (up to 4 bytes) are packed into the entry itself; longer ones are
+// stored at the offset given by value.
+func (t *TiffReader) readASCII(count, value uint32) (string, error) {
+	if count == 0 {
+		return "", nil
+	}
+	buf := make([]byte, count)
+	if count <= 4 {
+		var v [4]byte
+		t.order.PutUint32(v[:], value)
+		copy(buf, v[:])
+	} else if _, err := t.r.ReadAt(buf, int64(value)); err != nil {
+		return "", err
+	}
+	return string(bytes.TrimRight(buf, "\x00")), nil
 }
 
 // ReadUInt16 reads an unsigned 16-bit integer from the TIFF file,

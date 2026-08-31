@@ -31,8 +31,10 @@ import (
 // WeekAvailability describes the OpenStreetMap tile-log data that is
 // available for one ISO week.
 type WeekAvailability struct {
-	Week    string // ISO 8601 week, eg. "2021-W07"
-	NumDays int    // number of days (1..7) that have a log file
+	Week     string    // ISO 8601 week, eg. "2021-W07"
+	NumDays  int       // number of days (1..7) that have a log file
+	FirstDay time.Time // earliest day in this week that has a log file
+	LastDay  time.Time // latest day in this week that has a log file
 }
 
 // Return the weeks for which OpenStreetMap has tile logs, together with
@@ -86,18 +88,35 @@ func GetAvailableWeeks(client *http.Client, now time.Time) ([]WeekAvailability, 
 	// the entry 202107 → 5 (in binary: 0000101), the server has log files
 	// for Tuesday (0000100) and Sunday (0000001) for the 7th week of 2021.
 	// That is, Tuesday, February 16, and Sunday, February 21.
+	type weekInfo struct {
+		days        uint8 // bitmask over time.Weekday
+		first, last time.Time
+	}
 	re := regexp.MustCompile(`<a href="tiles-(\d{4}-\d\d-\d\d)\.txt\.xz">`)
-	available := make(map[int]uint8) // (year*100+isoweek) → 7 bits
+	available := make(map[int]*weekInfo) // year*100+isoweek → weekInfo
 	for _, m := range re.FindAllSubmatch(body, -1) {
-		if t, err := time.Parse("2006-01-02", string(m[1])); err == nil {
-			year, week := t.ISOWeek()
-			available[year*100+week] |= 1 << uint(t.Weekday())
+		t, err := time.Parse("2006-01-02", string(m[1]))
+		if err != nil {
+			continue
+		}
+		year, week := t.ISOWeek()
+		wi := available[year*100+week]
+		if wi == nil {
+			wi = &weekInfo{first: t, last: t}
+			available[year*100+week] = wi
+		}
+		wi.days |= 1 << uint(t.Weekday())
+		if t.Before(wi.first) {
+			wi.first = t
+		}
+		if t.After(wi.last) {
+			wi.last = t
 		}
 	}
 
 	now = now.UTC()
 	result := make([]WeekAvailability, 0, len(available))
-	for key, days := range available {
+	for key, wi := range available {
 		year, week := key/100, key%100
 		// Skip the current week and any week that ended in the last two
 		// days, giving OpenStreetMap time to publish that week's last days.
@@ -106,8 +125,10 @@ func GetAvailableWeeks(client *http.Client, now time.Time) ([]WeekAvailability, 
 			continue
 		}
 		result = append(result, WeekAvailability{
-			Week:    fmt.Sprintf("%04d-W%02d", year, week),
-			NumDays: bits.OnesCount8(days),
+			Week:     fmt.Sprintf("%04d-W%02d", year, week),
+			NumDays:  bits.OnesCount8(wi.days),
+			FirstDay: wi.first,
+			LastDay:  wi.last,
 		})
 	}
 	sort.Slice(result, func(i, j int) bool { return result[i].Week < result[j].Week })
