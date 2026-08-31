@@ -31,7 +31,7 @@ CI (`.github/workflows/build-test.yml`) runs `go build`, `go vet` and
 `go test -v ./...` and must be green before a pull request can merge. Keep
 `gofmt` clean.
 
-[`TECHNICAL_DESIGN.md`](TECHNICAL_DESIGN.md) explains how the pipeline works —
+[`docs/technical-design.md`](docs/technical-design.md) explains how the pipeline works —
 the quad-tree ordering, the streaming raster build, and the file-size tricks.
 Worth reading before touching `cmd/osmviews-builder`.
 
