@@ -117,9 +117,10 @@ func (p *Painter) Close() error {
 }
 
 // Function emitRaster is called when the Painter has finished painting
-// pixels into the current Raster. The raster gets removed from the tree,
-// compressed, and stored into a temporary file.
-// TODO: Subsample pixels to parent raster on behalf of GeoTIFF overview.
+// pixels into the current Raster. Its pixels are first subsampled into the
+// parent raster (building the GeoTIFF overview pyramid inline), then the
+// raster is removed from the tree, compressed, and stored into a temporary
+// file.
 func (p *Painter) emitRaster() error {
 	raster := p.raster
 	if raster.parent != nil {
