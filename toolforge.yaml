@@ -42,7 +42,7 @@ components:
       command: /layers/heroku_go/go_target/bin/osmviews-builder
       schedule: "@daily"
       # mount: none has handled the full zoom-18 paint in ~800 MiB (see
-      # docs/technical-design.md); bump to "all" with an explicit
+      # docs/defensive-publication/); bump to "all" with an explicit
       # --workdir if ephemeral disk ever becomes the limit.
       mount: none
       retry: 0

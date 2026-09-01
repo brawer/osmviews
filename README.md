@@ -21,7 +21,6 @@ For any location on the planet, up to ~150m/z18 resolution.
 
 * `cmd/webserver` is the [OSMViews webserver](https://osmviews.toolforge.org).
 * `cmd/osmviews-builder` is the pipeline that computes the data.
-* [`docs/technical-design.md`](docs/technical-design.md) explains how it all works.
 * `docs` contains further [documentation](docs/).
 
 Client libraries are maintained in separate repositories:
@@ -30,3 +29,41 @@ Client libraries are maintained in separate repositories:
 * Rust: [brawer/osmviews-rs](https://github.com/brawer/osmviews-rs) [![crates.io](https://img.shields.io/crates/v/osmviews)](https://crates.io/crates/osmviews)
 
 Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+
+## How it works — and prior art
+
+The techniques used by `cmd/osmviews-builder` — and by the
+[`osmviews-rs`](https://github.com/brawer/osmviews-rs) and
+[`osmviews-py`](https://github.com/brawer/osmviews-py) client libraries — are
+written up as a **defensive publication**. It doubles as a high-level tour of
+the whole system: the level-embedding tile key, the streaming per-period sort
+and cross-period merge, the constant-memory raster construction with inline
+overviews, and the Cloud-Optimized GeoTIFF layout.
+
+> *Method for Memory-Bounded Construction of a Globally Complete,
+> High-Zoom-Level Cloud-Optimized GeoTIFF from Tile-Access Logs.*
+> Technical Disclosure Commons, 2026.
+> <!-- add the tdcommons.org URL here once the entry is live -->
+
+**[Download the PDF](https://raw.githubusercontent.com/brawer/osmviews/main/docs/defensive-publication/defensive-publication.pdf)**
+&nbsp;·&nbsp;
+[source and build instructions](https://github.com/brawer/osmviews/tree/main/docs/defensive-publication)
+
+It is published to establish prior art and keep these techniques free to use.
+
+
+## License
+
+Code: **MIT** — see [`LICENSE`](LICENSE).
+
+The defensive publication under
+[`docs/defensive-publication/`](docs/defensive-publication) — the LaTeX source
+and the rendered PDF — is licensed **CC BY 4.0**.
+
+The OSMViews raster this pipeline produces is released into the public domain
+under **CC0 1.0**.
+
+This repository is [REUSE](https://reuse.software) compliant: every file
+declares its copyright and license, either in an SPDX header or via
+[`REUSE.toml`](REUSE.toml).
