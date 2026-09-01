@@ -33,6 +33,11 @@ to Toolforge. Nothing is published to a package registry.
    are frozen — a botched release can only be superseded by a new version, never
    re-tagged.
 
+> **Housekeeping:** `release-please-config.json` carries a `bootstrap-sha`
+> pinned to the `0.1.1` commit, because the pre-release-please tags are bare
+> (`0.1.1`, no `v`) and release-please can't anchor to them. Once `v0.1.2` or
+> later exists as a real anchor tag, delete that line.
+
 ## Choosing the version number
 
 release-please picks the bump from the commit types since the last release:
