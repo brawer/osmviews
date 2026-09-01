@@ -13,6 +13,13 @@ Conventional Commit history. Versioning follows
 the **minor** version may be breaking — see
 [RELEASING.md](RELEASING.md#choosing-the-version-number).
 
+## [0.1.2](https://github.com/brawer/osmviews/compare/v0.1.1...v0.1.2) (2026-09-01)
+
+
+### 🆕 Features
+
+* log memory use at key points of the builder run ([b88d384](https://github.com/brawer/osmviews/commit/b88d3844be48c133397f8ee097a12d1f76f2e422))
+
 ## [0.1.1](https://github.com/brawer/osmviews/releases/tag/0.1.1) (2026-08-31)
 
 Earlier tags (`0.0.2`…`0.1.1`) predate this changelog; see the
