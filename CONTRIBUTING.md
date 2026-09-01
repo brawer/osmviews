@@ -71,5 +71,7 @@ a PR are not checked — only the title that gets squashed.
 
 ## Releasing and deploying
 
-Releases are cut by tagging (`X.Y.Z`) and deployed to Toolforge; see
-[`docs/release.md`](docs/release.md).
+Releases are automated with
+[release-please](https://github.com/googleapis/release-please): merging a
+`feat:`/`fix:`/`perf:` PR updates an open release pull request, and merging that
+PR tags `vX.Y.Z` and deploys to Toolforge. See [`RELEASING.md`](RELEASING.md).

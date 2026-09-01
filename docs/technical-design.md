@@ -280,5 +280,5 @@ The output filename is keyed on the last day of the most recent week, so re-runs
 within the same week are idempotent no-ops, and a crashed run simply starts over
 next time (weekly files it already computed are cached).
 
-See [`release.md`](release.md) for how a new version is built and
+See [`RELEASING.md`](../RELEASING.md) for how a new version is built and
 deployed.
