@@ -30,9 +30,9 @@ type TiffMetadata struct {
 }
 
 // SoftwareVersion is written into the Software tag (305) of every output
-// GeoTIFF. A release build overwrites it via a linker flag
-// (-ldflags "-X main.SoftwareVersion=OSMViews/0.7.3"); otherwise main()
-// fills in the source revision via internal/version.
+// GeoTIFF. main() resolves it via internal/version: a released build reports
+// its version, any other build the source revision. A linker flag
+// (-ldflags "-X main.SoftwareVersion=…") still overrides it if set.
 var SoftwareVersion = "OSMViews"
 
 type Raster struct {

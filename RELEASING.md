@@ -71,19 +71,17 @@ deployment builds `main` at `HEAD` (`toolforge.yaml` pins `ref: main`), so
 ## Verify
 
 ```sh
-# Server header carries the deployed revision:
+# Server header carries the deployed version:
 curl -sI https://osmviews.toolforge.org/ | grep -i '^server:'
-# → OSMViews/git-<commit>, where <commit> is the tagged commit
-git tag --points-at "$(curl -sI https://osmviews.toolforge.org/ \
-  | sed -n 's#.*OSMViews/git-##p' | tr -d '\r')"
+# → OSMViews/vX.Y.Z+<commit>
 
 # The daily job produces a fresh GeoTIFF within a day:
 curl -sI https://osmviews.toolforge.org/download/osmviews.tiff | grep -i last-modified
 ```
 
-The buildpack build does not pass linker flags, so the `Software` GeoTIFF
-tag and the `Server` header read `OSMViews/git-<commit>` rather than the
-tag; the commit is what carries the tag.
+The version comes from `internal/version/release.go` (set by release-please,
+compiled in by the buildpack); the `+<commit>` suffix is the exact source
+revision. The GeoTIFF's TIFF 6.0 Software tag (305) carries the same string.
 
 ## If the automatic deploy fails
 
