@@ -19,10 +19,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-// ServerVersion is returned to HTTP clients as the Server header. A
-// release build overwrites it via a linker flag
-// (-ldflags "-X main.ServerVersion=OSMViews/0.7"); otherwise main() fills
-// in the source revision from the build info.
+// ServerVersion is returned to HTTP clients as the Server header. main()
+// resolves it via internal/version: a released build reports its version,
+// any other build the source revision. A linker flag
+// (-ldflags "-X main.ServerVersion=…") still overrides it if set.
 var ServerVersion = "OSMViews"
 
 func main() {
