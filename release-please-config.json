@@ -4,6 +4,7 @@
   "bump-minor-pre-major": true,
   "bump-patch-for-minor-pre-major": true,
   "changelog-path": "CHANGELOG.md",
+  "bootstrap-sha": "706216a4ad4117c946b124c9743b27ec0d817997",
   "packages": {
     ".": {
       "extra-files": ["CITATION.cff"]
