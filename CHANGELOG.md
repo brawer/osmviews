@@ -13,6 +13,13 @@ Conventional Commit history. Versioning follows
 the **minor** version may be breaking — see
 [RELEASING.md](RELEASING.md#choosing-the-version-number).
 
+## [0.1.2](https://github.com/brawer/osmviews/compare/v0.1.1...v0.1.2) (2026-09-01)
+
+
+### 🐞 Fixes
+
+* report the release version from deployed binaries ([8f5becc](https://github.com/brawer/osmviews/commit/8f5becc6b686c8d72136ed263158b4fd31e18f34))
+
 ## [0.1.1](https://github.com/brawer/osmviews/releases/tag/0.1.1) (2026-08-31)
 
 Earlier tags (`0.0.2`…`0.1.1`) predate this changelog; see the
