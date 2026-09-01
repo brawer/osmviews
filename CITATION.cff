@@ -16,7 +16,7 @@ authors:
 repository-code: "https://github.com/brawer/osmviews"
 url: "https://osmviews.toolforge.org"
 license: MIT
-version: 0.1.0
+version: 0.1.1 # x-release-please-version
 keywords:
   - openstreetmap
   - osm
