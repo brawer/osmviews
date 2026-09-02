@@ -13,6 +13,13 @@ Conventional Commit history. Versioning follows
 the **minor** version may be breaking — see
 [RELEASING.md](RELEASING.md#choosing-the-version-number).
 
+## [0.1.3](https://github.com/brawer/osmviews/compare/v0.1.2...v0.1.3) (2026-09-02)
+
+
+### 🆕 Features
+
+* **osmviews-builder:** publish a CycloneDX BOM for each GeoTIFF ([0e0f3fb](https://github.com/brawer/osmviews/commit/0e0f3fb14fae5fb0f2526f54bf2a57d6558ca873))
+
 ## [0.1.2](https://github.com/brawer/osmviews/compare/v0.1.1...v0.1.2) (2026-09-01)
 
 
