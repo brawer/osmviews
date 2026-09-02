@@ -32,6 +32,32 @@ func TestResolve(t *testing.T) {
 	}
 }
 
+func TestRevision(t *testing.T) {
+	rev, modified := Revision()
+	// A `go test` binary usually records no VCS revision; a toolchain that
+	// does must give a full-length hex string, not the truncated form.
+	if rev != "" && !regexp.MustCompile(`^[0-9a-f]{40}$`).MatchString(rev) {
+		t.Errorf("Revision() = %q, want empty or a 40-hex revision", rev)
+	}
+	// Whatever Revision reports must agree with what Resolve embeds.
+	if rev == "" {
+		return
+	}
+	want := "OSMViews/v" + Release + "+" + rev[:12]
+	if modified {
+		want += "-modified"
+	}
+	if Release == "" {
+		want = "OSMViews/git-" + rev[:12]
+		if modified {
+			want += "-modified"
+		}
+	}
+	if got := Resolve(Base); got != want {
+		t.Errorf("Resolve(Base) = %q, want %q (from Revision)", got, want)
+	}
+}
+
 func TestResolveRealBuild(t *testing.T) {
 	// A linker-flag build is passed through untouched.
 	if got := Resolve("OSMViews/9.9.9"); got != "OSMViews/9.9.9" {

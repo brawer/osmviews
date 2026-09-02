@@ -40,24 +40,33 @@ func resolve(v, release, rev string) string {
 	return v + "/git-" + rev
 }
 
+// Revision returns the full source revision recorded in the build info and
+// whether the working tree was modified when the binary was built. The
+// revision is "" if the toolchain recorded none, e.g. a `go test` binary or
+// a build from an unpacked source archive. Unlike the string baked into the
+// Software tag, this revision is not truncated, so callers can build an
+// exact Package-URL from it (see cmd/osmviews-builder/bom.go).
+func Revision() (revision string, modified bool) {
+	bi, ok := debug.ReadBuildInfo()
+	if !ok {
+		return "", false
+	}
+	for _, s := range bi.Settings {
+		switch s.Key {
+		case "vcs.revision":
+			revision = s.Value
+		case "vcs.modified":
+			modified = s.Value == "true"
+		}
+	}
+	return revision, modified
+}
+
 // revision returns the source revision recorded in the build info, trimmed
 // to 12 hex digits and suffixed with "-modified" when the working tree was
 // dirty. It is "" if no revision was recorded.
 func revision() string {
-	bi, ok := debug.ReadBuildInfo()
-	if !ok {
-		return ""
-	}
-	var rev string
-	var dirty bool
-	for _, s := range bi.Settings {
-		switch s.Key {
-		case "vcs.revision":
-			rev = s.Value
-		case "vcs.modified":
-			dirty = s.Value == "true"
-		}
-	}
+	rev, dirty := Revision()
 	if rev == "" {
 		return ""
 	}

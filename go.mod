@@ -10,6 +10,7 @@ go 1.25.0
 require (
 	github.com/andybalholm/brotli v1.2.3
 	github.com/fogleman/gg v1.3.0
+	github.com/google/uuid v1.6.0
 	github.com/lanrat/extsort v1.4.2
 	github.com/minio/minio-go/v7 v7.3.0
 	github.com/orcaman/writerseeker v0.0.0-20200621085525-1d3f536ff85e
@@ -23,7 +24,6 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/klauspost/compress v1.19.2 // indirect
 	github.com/klauspost/cpuid/v2 v2.4.0 // indirect
 	github.com/klauspost/crc32 v1.3.0 // indirect
