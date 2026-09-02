@@ -28,6 +28,17 @@ jobs:
           go build -o artifacts/webserver -ldflags="-s -w" -v ./cmd/webserver
     - name: Test
       run: go test -v ./...
+    - name: Validate the CycloneDX BOM against the specification
+      # cmd/osmviews-builder/bom.go generates the BOM; the golden test fixture
+      # is a representative instance kept byte-identical by TestWriteBOM_Golden.
+      # Validating it here checks the generator's output against the spec.
+      env:
+        # cyclonedx/cyclonedx-cli:0.33.1
+        CYCLONEDX_CLI: cyclonedx/cyclonedx-cli@sha256:9a37575fb51fcaed3a4c62dddba091c46ffc867712e46bdb6cdf219a7e90a061
+      run: |
+          docker run --rm --volume "$PWD/cmd/osmviews-builder/testdata:/bom:ro" \
+            "$CYCLONEDX_CLI" \
+            validate --input-file /bom/bom.golden.cdx.json --fail-on-errors
 
   # On a release tag (vX.Y.Z, pushed by release-please), ask the Toolforge
   # components API to rebuild the image and recreate the components

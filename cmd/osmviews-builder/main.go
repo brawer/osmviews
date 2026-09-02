@@ -18,6 +18,10 @@ import (
 	"github.com/brawer/osmviews/v2/internal/version"
 )
 
+// maxZoom is the deepest zoom level painted into the output GeoTIFF; one
+// tile view at this level becomes one pixel. It is also recorded in the BOM.
+const maxZoom = 18
+
 func main() {
 	SoftwareVersion = version.Resolve(SoftwareVersion)
 	ctx := context.Background()
@@ -74,8 +78,10 @@ func main() {
 	localStatsPlotPath := filepath.Join(*workdir, fmt.Sprintf("osmviews-statsplot-%s.png", date))
 	remotepath := fmt.Sprintf("public/osmviews-%s.tiff", date)
 	remoteStatsPath := fmt.Sprintf("public/osmviews-stats-%s.json", date)
+	localBomPath := filepath.Join(*workdir, fmt.Sprintf("osmviews-%s.cdx.json", date))
+	remoteBomPath := fmt.Sprintf("public/osmviews-%s.cdx.json", date)
 
-	// Check if the output file already exists in storage.
+	// Check if the output files already exist in storage.
 	// If we can retrieve object stats without an error, we don’t need
 	// to do anything and are completely done.
 	if storage != nil {
@@ -83,23 +89,26 @@ func main() {
 		hasGeoTiff := err == nil
 		_, err = storage.Stat(ctx, bucket, remoteStatsPath)
 		hasStats := err == nil
-		if hasGeoTiff && hasStats {
-			logger.Printf("already in storage: %s/%s and %s/%s; nothing to do",
-				bucket, remotepath, bucket, remoteStatsPath)
+		_, err = storage.Stat(ctx, bucket, remoteBomPath)
+		hasBom := err == nil
+		if hasGeoTiff && hasStats && hasBom {
+			logger.Printf("already in storage: %s/%s, %s/%s and %s/%s; nothing to do",
+				bucket, remotepath, bucket, remoteStatsPath, bucket, remoteBomPath)
 			return
 		}
 	}
 
-	// Paint the output GeoTIFF file.
+	// Paint the output GeoTIFF file. The description deliberately carries no
+	// generation timestamp, so a rebuild of the same week is byte-identical
+	// and the BOM's recorded hashes stay valid.
 	meta := TiffMetadata{
 		Description: fmt.Sprintf(
 			"OpenStreetMap view density, in weekly user views per km2. "+
-				"Tile logs %s..%s, generated %s. https://osmviews.toolforge.org",
-			logs.firstDay.Format("2006-01-02"), logs.lastDay.Format("2006-01-02"),
-			time.Now().UTC().Format("2006-01-02 15:04 UTC")),
+				"Tile logs %s..%s. https://osmviews.toolforge.org",
+			logs.firstDay.Format("2006-01-02"), logs.lastDay.Format("2006-01-02")),
 		DateTime: logs.lastDay,
 	}
-	if err := paint(localpath, 18, logs.readers, logs.weights, meta, ctx); err != nil {
+	if err := paint(localpath, maxZoom, logs.readers, logs.weights, meta, ctx); err != nil {
 		logger.Fatalf("painting %s: %v", localpath, err)
 	}
 
@@ -108,16 +117,44 @@ func main() {
 		logger.Fatalf("computing statistics: %v", err)
 	}
 
-	// Upload the output file to storage, and garbage-collect old files.
+	// Build the CycloneDX Bill of Materials for the GeoTIFF: the exact bytes
+	// (SHA-256/512) and the software revision that produced them. See bom.go
+	// and https://github.com/brawer/osmviews/issues/87.
+	sha256hex, sha512hex, err := hashFile(localpath)
+	if err != nil {
+		logger.Fatalf("hashing %s: %v", localpath, err)
+	}
+	revision, modified := version.Revision()
+	if err := writeBOM(localBomPath, bomInputs{
+		Date:     logs.lastDay,
+		FirstDay: logs.firstDay,
+		Weeks:    len(logs.readers),
+		SHA256:   sha256hex,
+		SHA512:   sha512hex,
+		Software: SoftwareVersion,
+		Revision: revision,
+		Modified: modified,
+		Release:  version.Release,
+		MaxZoom:  maxZoom,
+	}); err != nil {
+		logger.Fatalf("building BOM %s: %v", localBomPath, err)
+	}
+
+	// Upload to storage, and garbage-collect old files. The BOM is uploaded
+	// first: a client that can already fetch a given GeoTIFF version must
+	// always be able to fetch its matching BOM.
 	if storage != nil {
+		if err := storage.PutFile(ctx, bucket, remoteBomPath, localBomPath, "application/vnd.cyclonedx+json"); err != nil {
+			logger.Fatalf("uploading %s/%s: %v", bucket, remoteBomPath, err)
+		}
 		if err := storage.PutFile(ctx, bucket, remotepath, localpath, "image/tiff"); err != nil {
 			logger.Fatalf("uploading %s/%s: %v", bucket, remotepath, err)
 		}
 		if err := storage.PutFile(ctx, bucket, remoteStatsPath, localStatsPath, "application/json"); err != nil {
 			logger.Fatalf("uploading %s/%s: %v", bucket, remoteStatsPath, err)
 		}
-		logger.Printf("uploaded %s/%s and %s/%s; done, %s",
-			bucket, remotepath, bucket, remoteStatsPath, memStats())
+		logger.Printf("uploaded %s/%s, %s/%s and %s/%s; done, %s",
+			bucket, remoteBomPath, bucket, remotepath, bucket, remoteStatsPath, memStats())
 
 		if err := Cleanup(storage); err != nil {
 			logger.Fatalf("garbage-collecting old files in storage: %v", err)

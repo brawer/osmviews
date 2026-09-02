@@ -107,6 +107,7 @@ func Cleanup(s Storage) error {
 	}{
 		{"internal/osmviews-builder/tilelogs-", `internal/osmviews-builder/tilelogs-\d{4}-W\d{2}(-\d+d)?\.br`, 60},
 		{"public/osmviews-", `public/osmviews-\d{8}\.tiff`, 3},
+		{"public/osmviews-", `public/osmviews-\d{8}\.cdx\.json`, 3},
 		{"public/osmviews-stats-", `public/osmviews-stats-\d{8}\.json`, 3},
 	} {
 		if err := cleanupPath("osmviews", p.prefix, p.pattern, p.keep, s); err != nil {

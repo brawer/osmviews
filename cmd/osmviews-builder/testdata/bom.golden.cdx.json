@@ -1,0 +1,252 @@
+{
+  "$schema": "http://cyclonedx.org/schema/bom-1.7.schema.json",
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.7",
+  "serialNumber": "urn:uuid:952d2cc2-17cf-5950-96ba-8344ac7cdce6",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2025-08-30T00:00:00Z",
+    "lifecycles": [
+      {
+        "phase": "post-build"
+      }
+    ],
+    "supplier": {
+      "name": "Sascha Brawer",
+      "url": [
+        "https://brawer.ch"
+      ]
+    },
+    "tools": {
+      "components": [
+        {
+          "type": "application",
+          "bom-ref": "osmviews-builder",
+          "supplier": {
+            "name": "Sascha Brawer",
+            "url": [
+              "https://brawer.ch"
+            ]
+          },
+          "name": "osmviews-builder",
+          "group": "github.com/brawer/osmviews",
+          "version": "0.1.2",
+          "publisher": "Sascha Brawer",
+          "purl": "pkg:github/brawer/osmviews@1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b",
+          "licenses": [
+            {
+              "license": {
+                "id": "MIT"
+              }
+            }
+          ],
+          "externalReferences": [
+            {
+              "type": "vcs",
+              "url": "https://github.com/brawer/osmviews"
+            },
+            {
+              "type": "build-system",
+              "url": "https://github.com/brawer/osmviews/actions"
+            }
+          ],
+          "properties": [
+            {
+              "name": "osmviews:software",
+              "value": "OSMViews/v0.1.2+1a2b3c4d5e6f"
+            },
+            {
+              "name": "osmviews:vcs:revision",
+              "value": "1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b"
+            },
+            {
+              "name": "osmviews:vcs:modified",
+              "value": "false"
+            },
+            {
+              "name": "osmviews:release",
+              "value": "0.1.2"
+            }
+          ]
+        }
+      ]
+    },
+    "component": {
+      "type": "data",
+      "bom-ref": "osmviews-geotiff-20250830",
+      "supplier": {
+        "name": "Sascha Brawer",
+        "url": [
+          "https://brawer.ch"
+        ]
+      },
+      "name": "osmviews",
+      "version": "2025-08-30",
+      "description": "OpenStreetMap view density, in weekly user views per km2 (Cloud-Optimized GeoTIFF, EPSG:3857, zoom 0-18).",
+      "purl": "pkg:generic/osmviews@2025-08-30?checksum=sha256:e62e556f8a0571441dea505cc41d8dcbb7996ffd66f8c98de20509e2b868d718&download_url=https%3A%2F%2Fosmviews.toolforge.org%2Fdownload%2Fosmviews.tiff",
+      "licenses": [
+        {
+          "license": {
+            "id": "CC0-1.0"
+          }
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "e62e556f8a0571441dea505cc41d8dcbb7996ffd66f8c98de20509e2b868d718"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "b35026d87271a012f6544e8b17c2bf7eee7b6e9d484341172a17512f3ce03cf74f159f55fc6aeb3ad4585138ca6f4686b4960cd62f6b44caddc97b6a9754f196"
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://osmviews.toolforge.org/download/osmviews.tiff"
+        },
+        {
+          "type": "website",
+          "url": "https://osmviews.toolforge.org"
+        },
+        {
+          "type": "vcs",
+          "url": "https://github.com/brawer/osmviews"
+        }
+      ],
+      "data": [
+        {
+          "bom-ref": "osmviews-dataset-20250830",
+          "type": "dataset",
+          "name": "OpenStreetMap tile view density",
+          "classification": "PUBLIC"
+        }
+      ],
+      "properties": [
+        {
+          "name": "osmviews:tileLogs:firstDay",
+          "value": "2024-09-02"
+        },
+        {
+          "name": "osmviews:tileLogs:lastDay",
+          "value": "2025-08-30"
+        },
+        {
+          "name": "osmviews:tileLogs:weeks",
+          "value": "52"
+        },
+        {
+          "name": "osmviews:raster:crs",
+          "value": "EPSG:3857"
+        },
+        {
+          "name": "osmviews:raster:maxZoom",
+          "value": "18"
+        }
+      ]
+    }
+  },
+  "components": [
+    {
+      "type": "data",
+      "bom-ref": "osm-tilelogs",
+      "supplier": {
+        "name": "OpenStreetMap Foundation",
+        "url": [
+          "https://osmfoundation.org"
+        ]
+      },
+      "name": "OpenStreetMap tile logs",
+      "version": "2025-08-30",
+      "description": "Per-tile access counts, one xz-compressed text file per day (tiles-YYYY-MM-DD.txt.xz).",
+      "purl": "pkg:generic/openstreetmap/tile-logs@2025-08-30?download_url=https%3A%2F%2Fplanet.openstreetmap.org%2Ftile_logs%2F",
+      "licenses": [
+        {
+          "license": {
+            "id": "CC0-1.0",
+            "acknowledgement": "concluded",
+            "url": "https://osmfoundation.org/wiki/Licensing_Working_Group/Minutes/2022-05-12#Using_tile_logs_for_ranking_a_non-ODbL_dataset"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://planet.openstreetmap.org/tile_logs/"
+        },
+        {
+          "type": "license",
+          "url": "https://osmfoundation.org/wiki/Licensing_Working_Group/Minutes/2022-05-12#Using_tile_logs_for_ranking_a_non-ODbL_dataset",
+          "comment": "OSM Foundation Licensing Working Group minutes confirming the tile logs are in the public domain."
+        }
+      ],
+      "data": [
+        {
+          "bom-ref": "osm-tilelogs-dataset",
+          "type": "dataset",
+          "name": "OpenStreetMap tile access logs",
+          "classification": "PUBLIC"
+        }
+      ],
+      "properties": [
+        {
+          "name": "osmviews:tileLogs:firstDay",
+          "value": "2024-09-02"
+        },
+        {
+          "name": "osmviews:tileLogs:lastDay",
+          "value": "2025-08-30"
+        }
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "ref": "osmviews-geotiff-20250830",
+      "dependsOn": [
+        "osm-tilelogs"
+      ]
+    },
+    {
+      "ref": "osm-tilelogs",
+      "dependsOn": []
+    }
+  ],
+  "formulation": [
+    {
+      "bom-ref": "osmviews-build-20250830",
+      "workflows": [
+        {
+          "bom-ref": "osmviews-build-workflow-20250830",
+          "uid": "osmviews-build-20250830",
+          "name": "OSMViews weekly GeoTIFF build",
+          "description": "Aggregates 52 weeks of OpenStreetMap tile-access logs (2024-09-02..2025-08-30) into the Cloud-Optimized GeoTIFF.",
+          "resourceReferences": [
+            {
+              "ref": "osmviews-builder"
+            }
+          ],
+          "taskTypes": [
+            "build"
+          ],
+          "inputs": [
+            {
+              "resource": {
+                "ref": "osm-tilelogs"
+              }
+            }
+          ],
+          "outputs": [
+            {
+              "type": "artifact",
+              "resource": {
+                "ref": "osmviews-geotiff-20250830"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

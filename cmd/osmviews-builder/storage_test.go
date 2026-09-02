@@ -38,6 +38,7 @@ func TestCleanup(t *testing.T) {
 	for _, date := range []string{"20211205", "20211212", "20211226", "20220102", "20220109"} {
 		for _, p := range []struct{ pattern, contentType string }{
 			{"public/osmviews-%s.tiff", "image/tiff"},
+			{"public/osmviews-%s.cdx.json", "application/vnd.cyclonedx+json"},
 			{"public/osmviews-stats-%s.json", "application/json"},
 		} {
 			path := fmt.Sprintf(p.pattern, date)
@@ -133,8 +134,11 @@ func TestCleanup(t *testing.T) {
 		"internal/osmviews-builder/tilelogs-2022-W39.br",
 		"internal/osmviews-builder/tilelogs-2022-W40.br",
 		"internal/otherproject’s_data_should/not/be/touched.txt",
+		"public/osmviews-20211226.cdx.json",
 		"public/osmviews-20211226.tiff",
+		"public/osmviews-20220102.cdx.json",
 		"public/osmviews-20220102.tiff",
+		"public/osmviews-20220109.cdx.json",
 		"public/osmviews-20220109.tiff",
 		"public/osmviews-not-matching-pattern.txt",
 		"public/osmviews-stats-20211226.json",
