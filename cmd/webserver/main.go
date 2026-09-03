@@ -76,16 +76,7 @@ func (ws *Webserver) HandleMain(w http.ResponseWriter, r *http.Request) {
 	h := w.Header()
 	h.Set("Server", ServerVersion)
 
-	// The provenance line links the BOM for the GeoTIFF currently on offer.
-	// BOM URLs are dated (immutable), so this is rendered per request.
-	prov := ""
-	if v := ws.storage.Version("osmviews.tiff"); v != "" {
-		prov = fmt.Sprintf(
-			"\n"+`<br/><b>Provenance:</b> <a href="download/osmviews-%s.cdx.json">CycloneDX BOM</a>`, v)
-	}
-
-	fmt.Fprint(w, strings.Replace(
-		`<!DOCTYPE html>
+	fmt.Fprint(w, `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -151,14 +142,15 @@ considerably faster than the Python one.</p>
 <br/><b>Clients:</b>
 <a href="https://github.com/brawer/osmviews-py">Python</a>,
 <a href="https://github.com/brawer/osmviews-rs">Rust</a>
-<br/><b>Download:</b> <a href="download/osmviews.tiff">Cloud-Optimized GeoTIFF</a>@@PROV@@
+<br/><b>Download:</b> <a href="download/osmviews.tiff">Cloud-Optimized GeoTIFF</a>
+<br/><b>Provenance:</b> <a href="https://github.com/brawer/osmviews/blob/main/docs/downloads.md">bill of materials &amp; verification</a>
 <br/><b>License:</b> <a href="https://creativecommons.org/publicdomain/zero/1.0/">CC0-1.0</a> (data), <a href="https://en.wikipedia.org/wiki/MIT_License">MIT</a> (code)
 </p>
 
 <p><img src="https://mirrors.creativecommons.org/presskit/buttons/88x31/svg/cc-zero.svg"
 width="88" height="31" alt="Public Domain" style="float:left"/></p>
 
-</body></html>`, "@@PROV@@", prov, 1))
+</body></html>`)
 }
 
 func (ws *Webserver) HandleDownload(w http.ResponseWriter, req *http.Request) {

@@ -10,7 +10,6 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 )
@@ -243,16 +242,6 @@ func TestWebserver_DownloadGeoTIFFLinksBOM(t *testing.T) {
 	}
 	if got := header.Get("Access-Control-Expose-Headers"); got != "ETag, Link" {
 		t.Errorf("Access-Control-Expose-Headers = %q, want %q", got, "ETag, Link")
-	}
-}
-
-func TestWebserver_MainPageLinksBOM(t *testing.T) {
-	req := httptest.NewRequest("GET", "/", nil)
-	w := httptest.NewRecorder()
-	testWebserver.HandleMain(w, req)
-	body := w.Body.String()
-	if !strings.Contains(body, `<a href="download/osmviews-20260830.cdx.json">CycloneDX BOM</a>`) {
-		t.Errorf("main page is missing the dated BOM link:\n%s", body)
 	}
 }
 
