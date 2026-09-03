@@ -31,6 +31,20 @@ Client libraries are maintained in separate repositories:
 Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 
+## Downloading the data
+
+The latest raster is always at
+**<https://osmviews.toolforge.org/download/osmviews.tiff>** — a Cloud-Optimized
+GeoTIFF, updated weekly. Each build also publishes a
+[CycloneDX](https://cyclonedx.org) bill of materials and a statistics file,
+addressed by date.
+
+See [`docs/downloads.md`](docs/downloads.md) for the URLs, how to check for
+updates without re-downloading, the integrity digests, how to tie a download
+back to a specific version, and how to record which OSMViews build a downstream
+artifact was made from.
+
+
 ## How it works — and prior art
 
 The techniques used by `cmd/osmviews-builder` — and by the
