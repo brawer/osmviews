@@ -21,24 +21,32 @@ import (
 var updateGolden = flag.Bool("update-golden", false, "rewrite testdata/*.golden files")
 
 // bomTestInputs is a fully-populated, deterministic set of inputs matching
-// testdata/bom.golden.cdx.json. The digests are the real SHA-256/512 of a
-// sentinel string (not of any actual GeoTIFF), so they are valid-length hex
-// and stable, without pretending to describe a real file.
+// testdata/bom.golden.cdx.json. Each digest is the real SHA-256/512 of a
+// sentinel string standing in for the file it describes (the GeoTIFF, the
+// stats JSON), so the values are valid-length hex and stable without
+// pretending to be digests of real files.
 func bomTestInputs() bomInputs {
-	const fixture = "osmviews golden BOM test fixture"
-	sum256 := sha256.Sum256([]byte(fixture))
-	sum512 := sha512.Sum512([]byte(fixture))
+	digest256 := func(s string) string {
+		h := sha256.Sum256([]byte(s))
+		return hex.EncodeToString(h[:])
+	}
+	digest512 := func(s string) string {
+		h := sha512.Sum512([]byte(s))
+		return hex.EncodeToString(h[:])
+	}
 	return bomInputs{
-		Date:     time.Date(2025, 8, 30, 0, 0, 0, 0, time.UTC),
-		FirstDay: time.Date(2024, 9, 2, 0, 0, 0, 0, time.UTC),
-		Weeks:    52,
-		SHA256:   hex.EncodeToString(sum256[:]),
-		SHA512:   hex.EncodeToString(sum512[:]),
-		Software: "OSMViews/v0.1.2+1a2b3c4d5e6f",
-		Revision: "1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b",
-		Modified: false,
-		Release:  "0.1.2",
-		MaxZoom:  18,
+		Date:        time.Date(2025, 8, 30, 0, 0, 0, 0, time.UTC),
+		FirstDay:    time.Date(2024, 9, 2, 0, 0, 0, 0, time.UTC),
+		Weeks:       52,
+		SHA256:      digest256("osmviews golden GeoTIFF fixture"),
+		SHA512:      digest512("osmviews golden GeoTIFF fixture"),
+		Software:    "OSMViews/v0.1.2+1a2b3c4d5e6f",
+		Revision:    "1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b",
+		Modified:    false,
+		Release:     "0.1.2",
+		MaxZoom:     18,
+		StatsSHA256: digest256("osmviews golden stats fixture"),
+		StatsSHA512: digest512("osmviews golden stats fixture"),
 	}
 }
 
@@ -297,6 +305,40 @@ func TestBOM_TileLogsComponent(t *testing.T) {
 	}
 	if !hasLicenseRef {
 		t.Errorf("tile logs has no 'license' external reference to the LWG minutes: %+v", tl.ExternalReferences)
+	}
+}
+
+// TestBOM_StatsReference checks that the GeoTIFF component points at the
+// dated statistics JSON, with digests, so the BOM is the discovery hub.
+func TestBOM_StatsReference(t *testing.T) {
+	in := bomTestInputs()
+	geotiff := buildBOM(in).Metadata.Component
+
+	var ref *cdxExternalRef
+	for i := range geotiff.ExternalReferences {
+		if strings.Contains(geotiff.ExternalReferences[i].URL, "osmviews-stats-") {
+			ref = &geotiff.ExternalReferences[i]
+		}
+	}
+	if ref == nil {
+		t.Fatalf("GeoTIFF has no stats external reference: %+v", geotiff.ExternalReferences)
+	}
+	if want := "https://osmviews.toolforge.org/download/osmviews-stats-20250830.json"; ref.URL != want {
+		t.Errorf("stats ref URL = %q, want %q", ref.URL, want)
+	}
+	if ref.Type != "other" {
+		t.Errorf("stats ref type = %q, want other", ref.Type)
+	}
+	if len(ref.Hashes) != 2 || ref.Hashes[0].Alg != "SHA-256" || ref.Hashes[0].Content != in.StatsSHA256 {
+		t.Errorf("stats ref hashes = %+v, want SHA-256/512 of the stats file", ref.Hashes)
+	}
+
+	// Without a hashed stats file the reference is still emitted, sans hashes.
+	in.StatsSHA256, in.StatsSHA512 = "", ""
+	for _, r := range buildBOM(in).Metadata.Component.ExternalReferences {
+		if strings.Contains(r.URL, "osmviews-stats-") && len(r.Hashes) != 0 {
+			t.Errorf("stats ref should have no hashes when the file was not hashed: %+v", r)
+		}
 	}
 }
 

@@ -2,7 +2,7 @@
   "$schema": "http://cyclonedx.org/schema/bom-1.7.schema.json",
   "bomFormat": "CycloneDX",
   "specVersion": "1.7",
-  "serialNumber": "urn:uuid:952d2cc2-17cf-5950-96ba-8344ac7cdce6",
+  "serialNumber": "urn:uuid:375bc2ba-a55e-5896-8b75-6f99cf1ec591",
   "version": 1,
   "metadata": {
     "timestamp": "2025-08-30T00:00:00Z",
@@ -83,7 +83,7 @@
       "name": "osmviews",
       "version": "2025-08-30",
       "description": "OpenStreetMap view density, in weekly user views per km2 (Cloud-Optimized GeoTIFF, EPSG:3857, zoom 0-18).",
-      "purl": "pkg:generic/osmviews@2025-08-30?checksum=sha256:e62e556f8a0571441dea505cc41d8dcbb7996ffd66f8c98de20509e2b868d718&download_url=https%3A%2F%2Fosmviews.toolforge.org%2Fdownload%2Fosmviews.tiff",
+      "purl": "pkg:generic/osmviews@2025-08-30?checksum=sha256:98c9734da0a3370f9efc164535ee72d03d91289956117853a158839fcc88da13&download_url=https%3A%2F%2Fosmviews.toolforge.org%2Fdownload%2Fosmviews.tiff",
       "licenses": [
         {
           "license": {
@@ -94,11 +94,11 @@
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "e62e556f8a0571441dea505cc41d8dcbb7996ffd66f8c98de20509e2b868d718"
+          "content": "98c9734da0a3370f9efc164535ee72d03d91289956117853a158839fcc88da13"
         },
         {
           "alg": "SHA-512",
-          "content": "b35026d87271a012f6544e8b17c2bf7eee7b6e9d484341172a17512f3ce03cf74f159f55fc6aeb3ad4585138ca6f4686b4960cd62f6b44caddc97b6a9754f196"
+          "content": "9751b7d917c9eda6848cf27961fd7ae65385b4d43e856c4787d740a9a6694cda57775664457df60004222c9907c39ab818f2e0ae4da6c61cf72246aaebf48855"
         }
       ],
       "externalReferences": [
@@ -113,6 +113,21 @@
         {
           "type": "vcs",
           "url": "https://github.com/brawer/osmviews"
+        },
+        {
+          "type": "other",
+          "url": "https://osmviews.toolforge.org/download/osmviews-stats-20250830.json",
+          "comment": "Rank and value distribution statistics for this GeoTIFF.",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "736a113b5c16f549cb18f09ee9fc6dd578d06903edf4a9d1196897c2f218386a"
+            },
+            {
+              "alg": "SHA-512",
+              "content": "cf63ed644f07cc73b0d37f5598d6adcb754bfc69a053aad58e5ebaa9d1b9cfe484373f53d75eefe3e31959464c0f3a71b9ae9a8203e2c3d2e9b23aa342df10e3"
+            }
+          ]
         }
       ],
       "data": [
