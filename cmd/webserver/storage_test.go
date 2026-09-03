@@ -20,10 +20,10 @@ func TestStorage_Reload(t *testing.T) {
 	storage := &Storage{
 		client: &fakeStorageClient{
 			objects: []minio.ObjectInfo{{
-				Key: "public/hello-20211229.txt", Size: 5,
+				Key: "public/osmviews-20211229.tiff", Size: 5,
 				ETag: "Test-ETag", LastModified: lastmod,
 			}},
-			blobs: map[string][]byte{"public/hello-20211229.txt": []byte("Hello")},
+			blobs: map[string][]byte{"public/osmviews-20211229.tiff": []byte("Hello")},
 		},
 		workdir: t.TempDir(),
 		files:   make(map[string]*localFile, 10),
@@ -46,9 +46,16 @@ func TestStorage_Reload(t *testing.T) {
 		t.Errorf("got %d files in %v, expected 1", len(storage.files), storage.files)
 	}
 
-	loc := storage.files["hello.txt"]
+	// The GeoTIFF is served under its de-dated name.
+	loc := storage.files["osmviews.tiff"]
+	if loc == nil {
+		t.Fatal("osmviews.tiff was not registered")
+	}
 	if loc.ETag != "Test-ETag" {
-		t.Errorf("got ETag=%v, want %v", loc.ETag, "testetag")
+		t.Errorf("got ETag=%v, want %v", loc.ETag, "Test-ETag")
+	}
+	if loc.Version != "20211229" {
+		t.Errorf("got Version=%v, want 20211229", loc.Version)
 	}
 
 	gotLastmod := loc.LastModified.Format(time.RFC3339)
@@ -57,8 +64,8 @@ func TestStorage_Reload(t *testing.T) {
 		t.Errorf("got LastMod=%s, want %s", gotLastmod, wantLastmod)
 	}
 
-	if loc.ContentType != "text/plain" {
-		t.Errorf("got ContentType=%s, want text/plain", loc.ContentType)
+	if loc.ContentType != "image/tiff" {
+		t.Errorf("got ContentType=%s, want image/tiff", loc.ContentType)
 	}
 
 	gotContent, err := os.ReadFile(loc.Path)
@@ -168,18 +175,19 @@ func (s *fakeStorageClient) FGetObject(ctx context.Context, bucketName, objectNa
 	return fmt.Errorf("object not found: %s/%s", bucketName, objectName)
 }
 
-func TestStorage_Reload_BOM(t *testing.T) {
+func TestStorage_Reload_Auxiliary(t *testing.T) {
 	day := func(s string) time.Time { d, _ := time.Parse("20060102", s); return d }
 	var objs []minio.ObjectInfo
 	blobs := map[string][]byte{}
-	for _, d := range []string{"20260808", "20260815", "20260822", "20260830"} {
-		key := "public/osmviews-" + d + ".cdx.json"
-		objs = append(objs, minio.ObjectInfo{Key: key, ETag: "etag-" + d, LastModified: day(d)})
-		blobs[key] = []byte(`{"bomFormat":"CycloneDX","specVersion":"1.7"}`)
+	add := func(key string, d string) {
+		objs = append(objs, minio.ObjectInfo{Key: key, ETag: "etag-" + key, LastModified: day(d)})
+		blobs[key] = []byte("{}")
 	}
-	tiff := "public/osmviews-20260830.tiff"
-	objs = append(objs, minio.ObjectInfo{Key: tiff, ETag: "etag-tiff", LastModified: day("20260830")})
-	blobs[tiff] = []byte("II*\x00 fake geotiff")
+	for _, d := range []string{"20260808", "20260815", "20260822", "20260830"} {
+		add("public/osmviews-"+d+".cdx.json", d)
+		add("public/osmviews-stats-"+d+".json", d)
+	}
+	add("public/osmviews-20260830.tiff", "20260830")
 
 	s := &Storage{
 		client:  &fakeStorageClient{objects: objs, blobs: blobs},
@@ -190,30 +198,36 @@ func TestStorage_Reload_BOM(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// BOMs are served only under their dated name, and only the newest three.
-	if s.files["osmviews.cdx.json"] != nil {
-		t.Error("BOMs must not be served under a de-dated name")
-	}
-	for _, d := range []string{"20260815", "20260822", "20260830"} {
-		bom := s.files["osmviews-"+d+".cdx.json"]
-		if bom == nil {
-			t.Errorf("missing dated BOM osmviews-%s.cdx.json", d)
-			continue
+	// The GeoTIFF keeps its de-dated URL; auxiliary files are dated-only,
+	// and each family independently keeps its three most recent.
+	for _, f := range []struct {
+		deDated, dated, ct string
+	}{
+		{"osmviews.cdx.json", "osmviews-%s.cdx.json", bomContentType},
+		{"osmviews-stats.json", "osmviews-stats-%s.json", "application/json"},
+	} {
+		if s.files[f.deDated] != nil {
+			t.Errorf("%s must not be served under a de-dated name", f.deDated)
 		}
-		if bom.Version != d {
-			t.Errorf("osmviews-%s.cdx.json Version = %q, want %q", d, bom.Version, d)
+		if s.files[fmt.Sprintf(f.dated, "20260808")] != nil {
+			t.Errorf("%s should have been dropped (keep-3)", fmt.Sprintf(f.dated, "20260808"))
 		}
-		if bom.ContentType != bomContentType {
-			t.Errorf("BOM content type = %q, want %q", bom.ContentType, bomContentType)
+		for _, d := range []string{"20260815", "20260822", "20260830"} {
+			name := fmt.Sprintf(f.dated, d)
+			loc := s.files[name]
+			if loc == nil {
+				t.Errorf("missing %s", name)
+				continue
+			}
+			if loc.Version != d {
+				t.Errorf("%s Version = %q, want %q", name, loc.Version, d)
+			}
+			if loc.ContentType != f.ct {
+				t.Errorf("%s content type = %q, want %q", name, loc.ContentType, f.ct)
+			}
 		}
-	}
-	if s.files["osmviews-20260808.cdx.json"] != nil {
-		t.Error("osmviews-20260808.cdx.json should have been dropped (keep-3)")
 	}
 
-	if tf := s.files["osmviews.tiff"]; tf == nil || tf.Version != "20260830" {
-		t.Fatalf("osmviews.tiff = %+v, want version 20260830", tf)
-	}
 	if got := s.Version("osmviews.tiff"); got != "20260830" {
 		t.Errorf("Version(osmviews.tiff) = %q, want 20260830", got)
 	}
