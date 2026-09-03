@@ -228,8 +228,8 @@ func TestStorage_Reload_Auxiliary(t *testing.T) {
 		}
 	}
 
-	if got := s.Version("osmviews.tiff"); got != "20260830" {
-		t.Errorf("Version(osmviews.tiff) = %q, want 20260830", got)
+	if tf := s.files["osmviews.tiff"]; tf == nil || tf.Version != "20260830" {
+		t.Fatalf("osmviews.tiff = %+v, want version 20260830", tf)
 	}
 }
 

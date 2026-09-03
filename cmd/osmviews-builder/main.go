@@ -147,21 +147,23 @@ func main() {
 		logger.Fatalf("building BOM %s: %v", localBomPath, err)
 	}
 
-	// Upload to storage, and garbage-collect old files. The BOM is uploaded
-	// first: a client that can already fetch a given GeoTIFF version must
-	// always be able to fetch its matching BOM.
+	// Upload to storage, and garbage-collect old files. The GeoTIFF goes
+	// last, because it is the entry point a consumer starts from: its Link
+	// header points at the BOM, and the BOM references the statistics JSON.
+	// Uploading referenced-before-referencer means whatever a consumer can
+	// reach is already there.
 	if storage != nil {
+		if err := storage.PutFile(ctx, bucket, remoteStatsPath, localStatsPath, "application/json"); err != nil {
+			logger.Fatalf("uploading %s/%s: %v", bucket, remoteStatsPath, err)
+		}
 		if err := storage.PutFile(ctx, bucket, remoteBomPath, localBomPath, "application/vnd.cyclonedx+json"); err != nil {
 			logger.Fatalf("uploading %s/%s: %v", bucket, remoteBomPath, err)
 		}
 		if err := storage.PutFile(ctx, bucket, remotepath, localpath, "image/tiff"); err != nil {
 			logger.Fatalf("uploading %s/%s: %v", bucket, remotepath, err)
 		}
-		if err := storage.PutFile(ctx, bucket, remoteStatsPath, localStatsPath, "application/json"); err != nil {
-			logger.Fatalf("uploading %s/%s: %v", bucket, remoteStatsPath, err)
-		}
 		logger.Printf("uploaded %s/%s, %s/%s and %s/%s; done, %s",
-			bucket, remoteBomPath, bucket, remotepath, bucket, remoteStatsPath, memStats())
+			bucket, remoteStatsPath, bucket, remoteBomPath, bucket, remotepath, memStats())
 
 		if err := Cleanup(storage); err != nil {
 			logger.Fatalf("garbage-collecting old files in storage: %v", err)
