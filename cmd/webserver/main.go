@@ -163,7 +163,10 @@ func (ws *Webserver) HandleDownload(w http.ResponseWriter, req *http.Request) {
 	c, err := ws.storage.Retrieve(path)
 	if err != nil {
 		if !errors.Is(err, ErrNotFound) {
-			log.Printf("serving /download/%s: %v", path, err)
+			// The request path, and the error text that echoes it, are
+			// attacker-influenced: strip line breaks so a crafted path
+			// cannot forge or split log lines.
+			log.Printf("serving /download/%s: %s", stripLineBreaks(path), stripLineBreaks(err.Error()))
 		}
 		http.NotFound(w, req)
 		return
@@ -206,6 +209,14 @@ func (ws *Webserver) HandleDownload(w http.ResponseWriter, req *http.Request) {
 		h.Set("Allow", "GET, HEAD, OPTIONS")
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	}
+}
+
+// stripLineBreaks removes the CR and LF characters that could otherwise let
+// an attacker-controlled string forge or split entries in a plain-text log.
+func stripLineBreaks(s string) string {
+	s = strings.ReplaceAll(s, "\n", "")
+	s = strings.ReplaceAll(s, "\r", "")
+	return s
 }
 
 // HandleRobotsTxt sends a constant robots.txt file back to the
