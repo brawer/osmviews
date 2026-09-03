@@ -55,14 +55,16 @@ the whole system: the level-embedding tile key, the streaming per-period sort
 and cross-period merge, the constant-memory raster construction with inline
 overviews, and the Cloud-Optimized GeoTIFF layout.
 
-> *Method for Memory-Bounded Construction of a Globally Complete,
-> High-Zoom-Level Cloud-Optimized GeoTIFF from Tile-Access Logs.*
+> Brawer, Sascha. *Method for Memory-Bounded Construction of a Globally
+> Complete, High-Zoom-Level Cloud-Optimized GeoTIFF from Tile-Access Logs.*
 > Technical Disclosure Commons, 2026.
-> <!-- add the tdcommons.org URL here once the entry is live -->
+> <https://www.tdcommons.org/dpubs_series/11589>
 
-**[Download the PDF](https://raw.githubusercontent.com/brawer/osmviews/main/docs/defensive-publication/defensive-publication.pdf)**
+**[Read on Technical Disclosure Commons](https://www.tdcommons.org/dpubs_series/11589)**
 &nbsp;·&nbsp;
-[source and build instructions](https://github.com/brawer/osmviews/tree/main/docs/defensive-publication)
+[PDF](https://raw.githubusercontent.com/brawer/osmviews/main/docs/defensive-publication/defensive-publication.pdf)
+&nbsp;·&nbsp;
+[LaTeX source and Makefile](https://github.com/brawer/osmviews/tree/main/docs/defensive-publication)
 
 It is published to establish prior art and keep these techniques free to use.
 
@@ -72,8 +74,8 @@ It is published to establish prior art and keep these techniques free to use.
 Code: **MIT** — see [`LICENSE`](LICENSE).
 
 The defensive publication under
-[`docs/defensive-publication/`](docs/defensive-publication) — the LaTeX source
-and the rendered PDF — is licensed **CC BY 4.0**.
+[`docs/defensive-publication/`](docs/defensive-publication) is licensed
+**CC BY 4.0**.
 
 The OSMViews raster this pipeline produces is released into the public domain
 under **CC0 1.0**.
