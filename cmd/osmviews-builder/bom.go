@@ -35,8 +35,8 @@ const (
 	bomSpecVersion = "1.7"
 	bomSchema      = "http://cyclonedx.org/schema/bom-1.7.schema.json"
 
-	bomDownloadURL = "https://osmviews.toolforge.org/download/osmviews.tiff"
 	bomWebsiteURL  = "https://osmviews.toolforge.org"
+	bomDownloadURL = bomWebsiteURL + "/download/osmviews.tiff"
 	bomVCSURL      = "https://github.com/brawer/osmviews"
 	bomBuildSysURL = "https://github.com/brawer/osmviews/actions"
 	bomTileLogsURL = "https://planet.openstreetmap.org/tile_logs/"
@@ -78,6 +78,11 @@ type bomInputs struct {
 	Modified bool      // whether the working tree was dirty
 	Release  string    // released version, e.g. "0.1.2", or ""
 	MaxZoom  int       // deepest zoom level in the GeoTIFF
+
+	// Digests of the sibling statistics JSON, referenced from the GeoTIFF
+	// component. Empty when the stats file was not hashed.
+	StatsSHA256 string
+	StatsSHA512 string
 }
 
 // hashFile returns the lower-case hex SHA-256 and SHA-512 digests of the file
@@ -142,6 +147,26 @@ func bomSupplier() *cdxOrgEntity {
 	return &cdxOrgEntity{Name: bomSupplierName, URL: []string{bomSupplierURL}}
 }
 
+// statsExternalRef points at the sibling statistics JSON for this GeoTIFF
+// version. It is the BOM, not an HTTP header, that ties the two together, so
+// the BOM stays the single hub for everything about a version. The format is
+// ad-hoc (see cmd/osmviews-builder/stats.go); the digests let a consumer
+// verify the file without a defined media type.
+func statsExternalRef(in bomInputs) cdxExternalRef {
+	ref := cdxExternalRef{
+		Type:    "other",
+		URL:     bomWebsiteURL + "/download/osmviews-stats-" + in.Date.UTC().Format("20060102") + ".json",
+		Comment: "Rank and value distribution statistics for this GeoTIFF.",
+	}
+	if in.StatsSHA256 != "" {
+		ref.Hashes = append(ref.Hashes, cdxHash{Alg: "SHA-256", Content: in.StatsSHA256})
+	}
+	if in.StatsSHA512 != "" {
+		ref.Hashes = append(ref.Hashes, cdxHash{Alg: "SHA-512", Content: in.StatsSHA512})
+	}
+	return ref
+}
+
 func buildBOM(in bomInputs) *cdxBOM {
 	date := in.Date.UTC().Format("2006-01-02")
 	dataRef := "osmviews-geotiff-" + in.Date.UTC().Format("20060102")
@@ -197,6 +222,7 @@ func buildBOM(in bomInputs) *cdxBOM {
 			{Type: "distribution", URL: bomDownloadURL},
 			{Type: "website", URL: bomWebsiteURL},
 			{Type: "vcs", URL: bomVCSURL},
+			statsExternalRef(in),
 		},
 		Data: []cdxComponentData{
 			{
@@ -372,9 +398,10 @@ type cdxHash struct {
 }
 
 type cdxExternalRef struct {
-	Type    string `json:"type"`
-	URL     string `json:"url"`
-	Comment string `json:"comment,omitempty"`
+	Type    string    `json:"type"`
+	URL     string    `json:"url"`
+	Comment string    `json:"comment,omitempty"`
+	Hashes  []cdxHash `json:"hashes,omitempty"`
 }
 
 type cdxComponentData struct {

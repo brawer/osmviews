@@ -118,24 +118,31 @@ func main() {
 	}
 
 	// Build the CycloneDX Bill of Materials for the GeoTIFF: the exact bytes
-	// (SHA-256/512) and the software revision that produced them. See bom.go
-	// and https://github.com/brawer/osmviews/issues/87.
+	// (SHA-256/512) and the software revision that produced them, plus a
+	// reference to the sibling statistics JSON. See bom.go and
+	// https://github.com/brawer/osmviews/issues/87.
 	sha256hex, sha512hex, err := hashFile(localpath)
 	if err != nil {
 		logger.Fatalf("hashing %s: %v", localpath, err)
 	}
+	statsSHA256, statsSHA512, err := hashFile(localStatsPath)
+	if err != nil {
+		logger.Fatalf("hashing %s: %v", localStatsPath, err)
+	}
 	revision, modified := version.Revision()
 	if err := writeBOM(localBomPath, bomInputs{
-		Date:     logs.lastDay,
-		FirstDay: logs.firstDay,
-		Weeks:    len(logs.readers),
-		SHA256:   sha256hex,
-		SHA512:   sha512hex,
-		Software: SoftwareVersion,
-		Revision: revision,
-		Modified: modified,
-		Release:  version.Release,
-		MaxZoom:  maxZoom,
+		Date:        logs.lastDay,
+		FirstDay:    logs.firstDay,
+		Weeks:       len(logs.readers),
+		SHA256:      sha256hex,
+		SHA512:      sha512hex,
+		Software:    SoftwareVersion,
+		Revision:    revision,
+		Modified:    modified,
+		Release:     version.Release,
+		MaxZoom:     maxZoom,
+		StatsSHA256: statsSHA256,
+		StatsSHA512: statsSHA512,
 	}); err != nil {
 		logger.Fatalf("building BOM %s: %v", localBomPath, err)
 	}
