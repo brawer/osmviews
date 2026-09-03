@@ -110,33 +110,36 @@ func (s *Storage) Reload(ctx context.Context) error {
 		Prefix:    "public/",
 		Recursive: false,
 	})
-	// Most files are served under a de-dated name ("osmviews.tiff",
-	// "osmviews-stats.json") that always points at the most recent version.
-	// Bills of materials are the exception: they are served only under their
-	// dated name, "osmviews-<YYYYMMDD>.cdx.json" (the object's own basename),
-	// so a BOM URL is immutable and names the exact GeoTIFF it describes. The
-	// three most recent are kept, matching the builder's own retention.
-	inStorage := make(map[string]minio.ObjectInfo, 5)
-	var bomNames []string // dated BOM names sort chronologically
+	// The GeoTIFF is served under a de-dated name, "osmviews.tiff", that
+	// always points at the most recent version. Every auxiliary file (the
+	// statistics JSON, the CycloneDX BOM, …) is served only under its dated
+	// basename, "osmviews-<...>-<YYYYMMDD>.<ext>", so its URL is immutable and
+	// names the exact GeoTIFF it belongs to. The three most recent of each
+	// auxiliary family are kept, matching the builder's own retention.
+	inStorage := make(map[string]minio.ObjectInfo, 8)
+	auxNames := make(map[string][]string) // "<stem>|<ext>" -> dated names
 	for obj := range objects {
 		m := objRegexp.FindStringSubmatch(obj.Key)
 		if m == nil {
 			continue
 		}
-		if m[3] == "cdx.json" {
-			dated := filepath.Base(obj.Key)
-			inStorage[dated] = obj
-			bomNames = append(bomNames, dated)
+		if m[3] == "tiff" {
+			if latest := m[1] + "." + m[3]; obj.LastModified.After(inStorage[latest].LastModified) {
+				inStorage[latest] = obj
+			}
 			continue
 		}
-		if latest := m[1] + "." + m[3]; obj.LastModified.After(inStorage[latest].LastModified) {
-			inStorage[latest] = obj
-		}
+		dated := filepath.Base(obj.Key)
+		inStorage[dated] = obj
+		family := m[1] + "|" + m[3]
+		auxNames[family] = append(auxNames[family], dated)
 	}
-	if len(bomNames) > 3 {
-		sort.Sort(sort.Reverse(sort.StringSlice(bomNames)))
-		for _, n := range bomNames[3:] {
-			delete(inStorage, n)
+	for _, names := range auxNames {
+		if len(names) > 3 {
+			sort.Sort(sort.Reverse(sort.StringSlice(names))) // dated names sort chronologically
+			for _, n := range names[3:] {
+				delete(inStorage, n)
+			}
 		}
 	}
 
