@@ -16,8 +16,15 @@ import (
 )
 
 func TestStorage_Reload(t *testing.T) {
+	lastmod, _ := time.Parse(time.RFC3339, "2021-12-29T13:14:15Z")
 	storage := &Storage{
-		client:  &fakeStorageClient{},
+		client: &fakeStorageClient{
+			objects: []minio.ObjectInfo{{
+				Key: "public/hello-20211229.txt", Size: 5,
+				ETag: "Test-ETag", LastModified: lastmod,
+			}},
+			blobs: map[string][]byte{"public/hello-20211229.txt": []byte("Hello")},
+		},
 		workdir: t.TempDir(),
 		files:   make(map[string]*localFile, 10),
 	}
@@ -135,20 +142,19 @@ func TestStorage_RetrieveErrors(t *testing.T) {
 	}
 }
 
+// fakeStorageClient serves the objects it is given. Tests that do not call
+// Reload can leave objects and blobs nil.
 type fakeStorageClient struct {
 	storageClient
+	objects []minio.ObjectInfo
+	blobs   map[string][]byte
 }
 
 func (s *fakeStorageClient) ListObjects(ctx context.Context, bucketName string, opts minio.ListObjectsOptions) <-chan minio.ObjectInfo {
 	ch := make(chan minio.ObjectInfo)
-
 	go func() {
-		lastmod, _ := time.Parse(time.RFC3339, "2021-12-29T13:14:15Z")
-		ch <- minio.ObjectInfo{
-			Key:          "public/hello-20211229.txt",
-			Size:         5,
-			ETag:         "Test-ETag",
-			LastModified: lastmod,
+		for _, o := range s.objects {
+			ch <- o
 		}
 		close(ch)
 	}()
@@ -156,10 +162,60 @@ func (s *fakeStorageClient) ListObjects(ctx context.Context, bucketName string, 
 }
 
 func (s *fakeStorageClient) FGetObject(ctx context.Context, bucketName, objectName, filePath string, opts minio.GetObjectOptions) error {
-	if bucketName == "osmviews" && objectName == "public/hello-20211229.txt" {
-		return os.WriteFile(filePath, []byte("Hello"), 0644)
-	} else {
-		return fmt.Errorf("object not found: %s/%s", bucketName, objectName)
+	if body, ok := s.blobs[objectName]; ok && bucketName == "osmviews" {
+		return os.WriteFile(filePath, body, 0644)
+	}
+	return fmt.Errorf("object not found: %s/%s", bucketName, objectName)
+}
+
+func TestStorage_Reload_BOM(t *testing.T) {
+	day := func(s string) time.Time { d, _ := time.Parse("20060102", s); return d }
+	var objs []minio.ObjectInfo
+	blobs := map[string][]byte{}
+	for _, d := range []string{"20260808", "20260815", "20260822", "20260830"} {
+		key := "public/osmviews-" + d + ".cdx.json"
+		objs = append(objs, minio.ObjectInfo{Key: key, ETag: "etag-" + d, LastModified: day(d)})
+		blobs[key] = []byte(`{"bomFormat":"CycloneDX","specVersion":"1.7"}`)
+	}
+	tiff := "public/osmviews-20260830.tiff"
+	objs = append(objs, minio.ObjectInfo{Key: tiff, ETag: "etag-tiff", LastModified: day("20260830")})
+	blobs[tiff] = []byte("II*\x00 fake geotiff")
+
+	s := &Storage{
+		client:  &fakeStorageClient{objects: objs, blobs: blobs},
+		workdir: t.TempDir(),
+		files:   map[string]*localFile{},
+	}
+	if err := s.Reload(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	// BOMs are served only under their dated name, and only the newest three.
+	if s.files["osmviews.cdx.json"] != nil {
+		t.Error("BOMs must not be served under a de-dated name")
+	}
+	for _, d := range []string{"20260815", "20260822", "20260830"} {
+		bom := s.files["osmviews-"+d+".cdx.json"]
+		if bom == nil {
+			t.Errorf("missing dated BOM osmviews-%s.cdx.json", d)
+			continue
+		}
+		if bom.Version != d {
+			t.Errorf("osmviews-%s.cdx.json Version = %q, want %q", d, bom.Version, d)
+		}
+		if bom.ContentType != bomContentType {
+			t.Errorf("BOM content type = %q, want %q", bom.ContentType, bomContentType)
+		}
+	}
+	if s.files["osmviews-20260808.cdx.json"] != nil {
+		t.Error("osmviews-20260808.cdx.json should have been dropped (keep-3)")
+	}
+
+	if tf := s.files["osmviews.tiff"]; tf == nil || tf.Version != "20260830" {
+		t.Fatalf("osmviews.tiff = %+v, want version 20260830", tf)
+	}
+	if got := s.Version("osmviews.tiff"); got != "20260830" {
+		t.Errorf("Version(osmviews.tiff) = %q, want 20260830", got)
 	}
 }
 
@@ -167,6 +223,7 @@ func TestStorage_objRegexp(t *testing.T) {
 	for _, s := range []string{
 		"public/osmviews-stats-20220631.json",
 		"public/osmviews-20220631.tiff",
+		"public/osmviews-20260830.cdx.json",
 	} {
 		if !objRegexp.MatchString(s) {
 			t.Errorf("should match but does not: %v", s)

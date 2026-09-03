@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -205,5 +206,68 @@ func makeTestWebserver() *Webserver {
 		LastModified: lastmod,
 	}
 
+	tiffPath := filepath.Join(storage.workdir, "t.tiff")
+	if err := os.WriteFile(tiffPath, []byte("II*\x00 fake geotiff"), 0644); err != nil {
+		log.Fatal(err)
+	}
+	storage.files["osmviews.tiff"] = &localFile{
+		Path:         tiffPath,
+		ContentType:  "image/tiff",
+		ETag:         "ETag-tiff",
+		LastModified: lastmod,
+		Version:      "20260830",
+	}
+	bomPath := filepath.Join(storage.workdir, "b.cdx.json")
+	if err := os.WriteFile(bomPath, []byte(`{"bomFormat":"CycloneDX"}`), 0644); err != nil {
+		log.Fatal(err)
+	}
+	storage.files["osmviews-20260830.cdx.json"] = &localFile{
+		Path:         bomPath,
+		ContentType:  bomContentType,
+		ETag:         "ETag-bom",
+		LastModified: lastmod,
+		Version:      "20260830",
+	}
+
 	return &Webserver{storage: storage}
+}
+
+func TestWebserver_DownloadGeoTIFFLinksBOM(t *testing.T) {
+	_, header, _, err := sendRequest("GET", "/download/osmviews.tiff", make(http.Header))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `</download/osmviews-20260830.cdx.json>; rel="describedby"; type="application/vnd.cyclonedx+json"`
+	if got := header.Get("Link"); got != want {
+		t.Errorf("Link header = %q, want %q", got, want)
+	}
+	if got := header.Get("Access-Control-Expose-Headers"); got != "ETag, Link" {
+		t.Errorf("Access-Control-Expose-Headers = %q, want %q", got, "ETag, Link")
+	}
+}
+
+func TestWebserver_MainPageLinksBOM(t *testing.T) {
+	req := httptest.NewRequest("GET", "/", nil)
+	w := httptest.NewRecorder()
+	testWebserver.HandleMain(w, req)
+	body := w.Body.String()
+	if !strings.Contains(body, `<a href="download/osmviews-20260830.cdx.json">CycloneDX BOM</a>`) {
+		t.Errorf("main page is missing the dated BOM link:\n%s", body)
+	}
+}
+
+func TestWebserver_DownloadBOMContentType(t *testing.T) {
+	status, header, _, err := sendRequest("GET", "/download/osmviews-20260830.cdx.json", make(http.Header))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status != http.StatusOK {
+		t.Fatalf("status = %d, want 200", status)
+	}
+	if got := header.Get("Content-Type"); got != "application/vnd.cyclonedx+json" {
+		t.Errorf("Content-Type = %q, want application/vnd.cyclonedx+json", got)
+	}
+	if header.Get("Link") != "" {
+		t.Errorf("BOM response should carry no Link header, got %q", header.Get("Link"))
+	}
 }
