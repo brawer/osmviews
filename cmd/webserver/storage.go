@@ -255,17 +255,6 @@ func (c *Content) Close() error {
 // A different error means the file is known but could not be read.
 var ErrNotFound = errors.New("not found")
 
-// Version returns the YYYYMMDD stamp of the currently served file, or "" if
-// it is unknown (e.g. before the first successful Reload).
-func (s *Storage) Version(filename string) string {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
-	if loc, ok := s.files[filename]; ok {
-		return loc.Version
-	}
-	return ""
-}
-
 func (s *Storage) Retrieve(filename string) (*Content, error) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
