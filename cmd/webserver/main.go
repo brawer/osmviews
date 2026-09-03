@@ -76,7 +76,15 @@ func (ws *Webserver) HandleMain(w http.ResponseWriter, r *http.Request) {
 	h := w.Header()
 	h.Set("Server", ServerVersion)
 
-	fmt.Fprintf(w, "%s",
+	// The provenance line links the BOM for the GeoTIFF currently on offer.
+	// BOM URLs are dated (immutable), so this is rendered per request.
+	prov := ""
+	if v := ws.storage.Version("osmviews.tiff"); v != "" {
+		prov = fmt.Sprintf(
+			"\n"+`<br/><b>Provenance:</b> <a href="download/osmviews-%s.cdx.json">CycloneDX BOM</a>`, v)
+	}
+
+	fmt.Fprint(w, strings.Replace(
 		`<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -143,14 +151,14 @@ considerably faster than the Python one.</p>
 <br/><b>Clients:</b>
 <a href="https://github.com/brawer/osmviews-py">Python</a>,
 <a href="https://github.com/brawer/osmviews-rs">Rust</a>
-<br/><b>Download:</b> <a href="download/osmviews.tiff">Cloud-Optimized GeoTIFF</a>
+<br/><b>Download:</b> <a href="download/osmviews.tiff">Cloud-Optimized GeoTIFF</a>@@PROV@@
 <br/><b>License:</b> <a href="https://creativecommons.org/publicdomain/zero/1.0/">CC0-1.0</a> (data), <a href="https://en.wikipedia.org/wiki/MIT_License">MIT</a> (code)
 </p>
 
 <p><img src="https://mirrors.creativecommons.org/presskit/buttons/88x31/svg/cc-zero.svg"
 width="88" height="31" alt="Public Domain" style="float:left"/></p>
 
-</body></html>`)
+</body></html>`, "@@PROV@@", prov, 1))
 }
 
 func (ws *Webserver) HandleDownload(w http.ResponseWriter, req *http.Request) {
@@ -182,6 +190,15 @@ func (ws *Webserver) HandleDownload(w http.ResponseWriter, req *http.Request) {
 		h.Set("ETag", fmt.Sprintf(`"%s"`, c.ETag))
 		h.Set("Content-Type", c.ContentType)
 		h.Set("Access-Control-Allow-Origin", "*")
+		// Point consumers at the CycloneDX BOM for this exact GeoTIFF
+		// version, so a supply-chain client need not parse a TIFF tag.
+		if c.Version != "" && strings.HasSuffix(path, ".tiff") {
+			stem := strings.TrimSuffix(path, ".tiff")
+			h.Set("Link", fmt.Sprintf(
+				`</download/%s-%s.cdx.json>; rel="describedby"; type="%s"`,
+				stem, c.Version, bomContentType))
+			h.Set("Access-Control-Expose-Headers", "ETag, Link")
+		}
 		http.ServeContent(w, req, "", c.LastModified, c)
 
 	case http.MethodOptions: // CORS pre-flight

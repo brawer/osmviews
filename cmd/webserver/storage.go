@@ -12,6 +12,8 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -33,6 +35,28 @@ type localFile struct {
 	ContentType  string
 	ETag         string
 	LastModified time.Time
+	Version      string // the YYYYMMDD from the object key, "" if none
+}
+
+// bomContentType is the media type registered for CycloneDX JSON.
+const bomContentType = "application/vnd.cyclonedx+json"
+
+// contentType returns the media type to serve a file of the given name with.
+func contentType(name string) string {
+	switch {
+	case strings.HasSuffix(name, ".cdx.json"):
+		return bomContentType
+	case strings.HasSuffix(name, ".json"):
+		return "application/json"
+	case strings.HasSuffix(name, ".gz"):
+		return "application/gzip"
+	case strings.HasSuffix(name, ".tiff"):
+		return "image/tiff"
+	case strings.HasSuffix(name, ".txt"):
+		return "text/plain"
+	default:
+		return "application/octet-stream"
+	}
 }
 
 // StorageClient is the subset of minio.Client used in this program.
@@ -86,14 +110,33 @@ func (s *Storage) Reload(ctx context.Context) error {
 		Prefix:    "public/",
 		Recursive: false,
 	})
+	// Most files are served under a de-dated name ("osmviews.tiff",
+	// "osmviews-stats.json") that always points at the most recent version.
+	// Bills of materials are the exception: they are served only under their
+	// dated name, "osmviews-<YYYYMMDD>.cdx.json" (the object's own basename),
+	// so a BOM URL is immutable and names the exact GeoTIFF it describes. The
+	// three most recent are kept, matching the builder's own retention.
 	inStorage := make(map[string]minio.ObjectInfo, 5)
+	var bomNames []string // dated BOM names sort chronologically
 	for obj := range objects {
-		if m := objRegexp.FindStringSubmatch(obj.Key); m != nil {
-			filename := fmt.Sprintf("%s.%s", m[1], m[3])
-			info := inStorage[filename]
-			if obj.LastModified.After(info.LastModified) {
-				inStorage[filename] = obj
-			}
+		m := objRegexp.FindStringSubmatch(obj.Key)
+		if m == nil {
+			continue
+		}
+		if m[3] == "cdx.json" {
+			dated := filepath.Base(obj.Key)
+			inStorage[dated] = obj
+			bomNames = append(bomNames, dated)
+			continue
+		}
+		if latest := m[1] + "." + m[3]; obj.LastModified.After(inStorage[latest].LastModified) {
+			inStorage[latest] = obj
+		}
+	}
+	if len(bomNames) > 3 {
+		sort.Sort(sort.Reverse(sort.StringSlice(bomNames)))
+		for _, n := range bomNames[3:] {
+			delete(inStorage, n)
 		}
 	}
 
@@ -121,22 +164,13 @@ func (s *Storage) Reload(ctx context.Context) error {
 
 		loc := &localFile{
 			LastModified: obj.LastModified.UTC(),
-			ContentType:  "application/octet-stream",
+			ContentType:  contentType(filename),
 			ETag:         obj.ETag,
 			Path:         path,
 		}
-
-		switch filepath.Ext(filename) {
-		case ".gz":
-			loc.ContentType = "application/gzip"
-		case ".json":
-			loc.ContentType = "application/json"
-		case ".tiff":
-			loc.ContentType = "image/tiff"
-		case ".txt":
-			loc.ContentType = "text/plain"
+		if m := objRegexp.FindStringSubmatch(obj.Key); m != nil {
+			loc.Version = m[2]
 		}
-
 		files[filename] = loc
 	}
 
@@ -199,6 +233,7 @@ type Content struct {
 	ContentType  string
 	ETag         string
 	LastModified time.Time
+	Version      string // the YYYYMMDD from the object key, "" if none
 }
 
 func (c *Content) Read(p []byte) (int, error) {
@@ -216,6 +251,17 @@ func (c *Content) Close() error {
 // ErrNotFound is returned by Retrieve when no servable file matches.
 // A different error means the file is known but could not be read.
 var ErrNotFound = errors.New("not found")
+
+// Version returns the YYYYMMDD stamp of the currently served file, or "" if
+// it is unknown (e.g. before the first successful Reload).
+func (s *Storage) Version(filename string) string {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	if loc, ok := s.files[filename]; ok {
+		return loc.Version
+	}
+	return ""
+}
 
 func (s *Storage) Retrieve(filename string) (*Content, error) {
 	s.mutex.RLock()
@@ -236,6 +282,7 @@ func (s *Storage) Retrieve(filename string) (*Content, error) {
 		ContentType:  loc.ContentType,
 		ETag:         loc.ETag,
 		LastModified: loc.LastModified,
+		Version:      loc.Version,
 	}
 	return c, nil
 }
