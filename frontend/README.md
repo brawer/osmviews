@@ -29,6 +29,12 @@ rebuilt in CI and, on deploy, by the Toolforge buildpack before the Go build. A
 `go build` without a prior `npm run build` still works — `cmd/webserver` then
 serves a short "not built" page at `/beta/`.
 
+Regenerate `package-lock.json` with **npm 10** (`npx npm@10 install`). The
+Toolforge Node buildpack bundles npm 10, and its `npm prune` step rewrites a
+lockfile that a newer npm wrote (dropping `libc` hints), which would dirty the
+tree and stamp the release binary `-modified`. CI runs the full
+`npm ci && npm run build && npm prune` and fails on any resulting diff.
+
 Tracked by [issue #100](https://github.com/brawer/osmviews/issues/100). While the
 app is a moving target it is `noindex` and `Disallow`ed in `robots.txt`; `/` and
 `/download/` are untouched.

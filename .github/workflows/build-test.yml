@@ -21,15 +21,21 @@ jobs:
         node-version-file: .node-version
         cache: npm
     - name: Build the frontend
-      # cmd/webserver embeds internal/webui/dist via //go:embed. The Toolforge
-      # deploy build produces it the same way, with the Node buildpack running
-      # "npm run build" before the Go build (see toolforge.yaml, issue #100).
+      # cmd/webserver embeds internal/webui/dist via //go:embed. Mirror the
+      # Toolforge deploy build (toolforge.yaml, issue #100): the Node buildpack
+      # runs npm ci -> npm run build -> npm prune before the Go build. Run the
+      # same three so any tree change they cause (which would make the Go build
+      # stamp the version "-modified") fails here, not in production.
       run: |
           npm ci
           npm run build
+          NODE_ENV=production npm prune
           test -f internal/webui/dist/index.html
-          # No built assets may be tracked in git (dist/.gitignore keeps them out).
-          test -z "$(git status --porcelain internal/webui/dist)"
+          # The frontend build must leave a clean tree: no tracked file changed
+          # (esp. package-lock.json, which an npm version skew can rewrite) and
+          # no built asset staged (dist/.gitignore keeps those out).
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
     - name: Install Go
       uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
       with:
