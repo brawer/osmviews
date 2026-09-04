@@ -31,7 +31,12 @@ make ci           # everything CI enforces (see below) — build+test+lint plus
 (`/download/` 404s; `/`, `/beta/`, `/robots.txt` work), so you can check cache
 headers, the SPA fallback and the untouched `/` page.
 
-CI (and `make ci`) run `scripts/check-frontend.sh` after the build:
+CI (`.github/workflows/build-test.yml`) runs one Makefile target per step —
+`frontend`, `check-frontend`, `lockfile-check`, `build`, `lint`, `test` — rather
+than duplicating their commands in the workflow, so local (`make ci`) and CI
+can't drift apart.
+
+`make check-frontend` runs `scripts/check-frontend.sh` after the build:
 
 - a gzipped JS size budget,
 - `npm audit --audit-level=high` (known vulnerabilities),

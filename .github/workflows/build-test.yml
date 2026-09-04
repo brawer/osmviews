@@ -20,26 +20,16 @@ jobs:
       with:
         node-version-file: .node-version
         cache: npm
+    # Each of these steps is a single Makefile target — see Makefile, whose
+    # comments explain what and why. Running the exact same commands here and
+    # in "make ci" is the point: it's how a future npm/Go skew between local
+    # dev and CI gets caught instead of silently drifting (cf. #103, #106).
     - name: Build the frontend
-      # cmd/webserver embeds internal/webui/dist via //go:embed. Mirror the
-      # Toolforge deploy build (toolforge.yaml, issue #100): the Node buildpack
-      # runs npm ci -> npm run build -> npm prune before the Go build. Run the
-      # same three so any tree change they cause (which would make the Go build
-      # stamp the version "-modified") fails here, not in production.
-      run: |
-          npm ci
-          npm run build
-          test -f internal/webui/dist/index.html
-          # Size budget + npm audit + dependency-licence check.
-          ./scripts/check-frontend.sh
-          # The Node buildpack prunes dev deps; do the same so a lockfile that
-          # an npm version skew would rewrite (making the Go build stamp the
-          # version "-modified") fails here, not in production.
-          NODE_ENV=production npm prune
-          # Clean tree: no tracked file changed (esp. package-lock.json) and no
-          # built asset staged (internal/webui/dist/.gitignore keeps those out).
-          git diff --exit-code
-          test -z "$(git status --porcelain)"
+      run: make frontend
+    - name: Check the frontend (size, npm audit, licences, signatures)
+      run: make check-frontend
+    - name: Guard package-lock.json against buildpack npm skew
+      run: make lockfile-check
     - name: Install Go
       uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
       with:
@@ -48,11 +38,11 @@ jobs:
       # No -X version flags: the version is compiled in from
       # internal/version (internal/version/release.go + the embedded VCS
       # revision), which is also what the Toolforge buildpack build gets.
-      run: |
-          go build -o artifacts/builder -ldflags="-s -w" -v ./cmd/osmviews-builder
-          go build -o artifacts/webserver -ldflags="-s -w" -v ./cmd/webserver
+      run: make build
+    - name: Lint
+      run: make lint
     - name: Test
-      run: go test -v ./...
+      run: make test
     - name: Validate the CycloneDX BOM against the specification
       # cmd/osmviews-builder/bom.go generates the BOM; the golden test fixture
       # is a representative instance kept byte-identical by TestWriteBOM_Golden.
