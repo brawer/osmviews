@@ -13,6 +13,13 @@ Conventional Commit history. Versioning follows
 the **minor** version may be breaking — see
 [RELEASING.md](RELEASING.md#choosing-the-version-number).
 
+## [0.1.6](https://github.com/brawer/osmviews/compare/v0.1.5...v0.1.6) (2026-09-04)
+
+
+### 🐞 Fixes
+
+* **webserver:** keep release builds from being stamped -modified ([7074cb4](https://github.com/brawer/osmviews/commit/7074cb41e8a564d851ab5c507e955dffbd224743))
+
 ## [0.1.5](https://github.com/brawer/osmviews/compare/v0.1.4...v0.1.5) (2026-09-04)
 
 
