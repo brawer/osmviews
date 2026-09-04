@@ -29,11 +29,15 @@ jobs:
       run: |
           npm ci
           npm run build
-          NODE_ENV=production npm prune
           test -f internal/webui/dist/index.html
-          # The frontend build must leave a clean tree: no tracked file changed
-          # (esp. package-lock.json, which an npm version skew can rewrite) and
-          # no built asset staged (dist/.gitignore keeps those out).
+          # Size budget + npm audit + dependency-licence check.
+          ./scripts/check-frontend.sh
+          # The Node buildpack prunes dev deps; do the same so a lockfile that
+          # an npm version skew would rewrite (making the Go build stamp the
+          # version "-modified") fails here, not in production.
+          NODE_ENV=production npm prune
+          # Clean tree: no tracked file changed (esp. package-lock.json) and no
+          # built asset staged (internal/webui/dist/.gitignore keeps those out).
           git diff --exit-code
           test -z "$(git status --porcelain)"
     - name: Install Go
