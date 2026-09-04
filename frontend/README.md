@@ -11,8 +11,16 @@ Toolforge Node buildpack detects them.
 
 ```sh
 npm ci            # install (uses the committed package-lock.json)
-npm run dev       # local dev server with HMR
+npm run dev       # Vite dev server with HMR (serves /beta/ on :5173)
 npm run build     # → internal/webui/dist/, embedded into the Go binary
+```
+
+To see it served by the actual Go webserver (cache headers, SPA fallback, the
+untouched `/` page) without S3 credentials:
+
+```sh
+npm run build
+go run ./cmd/webserver --dev --port 8080   # /download/ 404s; /, /beta/, /robots.txt work
 ```
 
 `npm run build` output is **not** checked in (see

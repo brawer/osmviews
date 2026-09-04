@@ -34,6 +34,7 @@ func main() {
 	port := flag.Int("port", 0, "port for serving HTTP requests")
 	workdir := flag.String("workdir", "webserver-workdir", "path to working directory on local disk")
 	showVersion := flag.Bool("version", false, "print version and exit")
+	dev := flag.Bool("dev", false, "local development: skip object storage, so /download/ 404s but /, /beta/ and /robots.txt work without S3 credentials")
 	flag.Parse()
 	if *showVersion {
 		fmt.Println(ServerVersion)
@@ -50,17 +51,25 @@ func main() {
 		}
 	}
 
-	storage, err := NewStorage(*workdir)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	if err := storage.Reload(context.Background()); err != nil {
-		log.Fatal(err)
-	}
-
 	ctx, cancel := context.WithCancel(context.Background())
-	go storage.Watch(ctx)
+	defer cancel()
+
+	var storage *Storage
+	if *dev {
+		log.Print("dev mode: object storage disabled, /download/ will return 404")
+		storage = &Storage{files: make(map[string]*localFile)}
+	} else {
+		var err error
+		storage, err = NewStorage(*workdir)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if err := storage.Reload(context.Background()); err != nil {
+			log.Fatal(err)
+		}
+		go storage.Watch(ctx)
+	}
+
 	server := &Webserver{storage: storage}
 	http.HandleFunc("/", server.HandleMain)
 	http.HandleFunc("/robots.txt", server.HandleRobotsTxt)
@@ -68,8 +77,7 @@ func main() {
 	http.HandleFunc("/download/", server.HandleDownload)
 	http.HandleFunc("/beta/", server.HandleBeta)
 	log.Printf("%s listening for HTTP requests on port %d", ServerVersion, *port)
-	err = http.ListenAndServe(":"+strconv.Itoa(*port), nil)
-	cancel()
+	err := http.ListenAndServe(":"+strconv.Itoa(*port), nil)
 	log.Fatalf("HTTP server stopped: %v", err)
 }
 
