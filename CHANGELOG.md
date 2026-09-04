@@ -13,6 +13,14 @@ Conventional Commit history. Versioning follows
 the **minor** version may be breaking — see
 [RELEASING.md](RELEASING.md#choosing-the-version-number).
 
+## [0.1.5](https://github.com/brawer/osmviews/compare/v0.1.4...v0.1.5) (2026-09-04)
+
+
+### 🆕 Features
+
+* **webserver:** add --dev flag for local runs without object storage ([da2289f](https://github.com/brawer/osmviews/commit/da2289f31c4c5033207df9fa06e4bcb3277827d1))
+* **webserver:** serve an embedded /beta/ web app shell ([b23c028](https://github.com/brawer/osmviews/commit/b23c0289ae8584270593499bb51924fb1dac8067))
+
 ## [0.1.4](https://github.com/brawer/osmviews/compare/v0.1.3...v0.1.4) (2026-09-03)
 
 
