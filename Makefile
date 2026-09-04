@@ -1,10 +1,13 @@
 # SPDX-FileCopyrightText: 2026 Sascha Brawer <sascha@brawer.ch>
 # SPDX-License-Identifier: MIT
 #
-# Convenience targets for local parity with CI and the Toolforge buildpack.
-# See frontend/README.md, cmd/webserver/README.md, cmd/osmviews-builder/README.md.
+# Local dev targets, also the single source of truth for what CI runs
+# (.github/workflows/build-test.yml calls these directly, one per step, so the
+# two can't drift). See frontend/README.md, cmd/webserver/README.md,
+# cmd/osmviews-builder/README.md.
 
-.PHONY: build webserver builder frontend dev test lint ci clean
+.PHONY: build webserver builder frontend check-frontend lockfile-check \
+	dev test lint ci clean
 
 # Build both binaries, matching CI's "Build" step.
 build: webserver builder
@@ -20,6 +23,21 @@ builder:
 frontend:
 	npm ci
 	npm run build
+	test -f internal/webui/dist/index.html
+
+# Size budget + npm audit + dependency-licence/signature checks. Assumes
+# "frontend" already ran, with dev dependencies still installed.
+check-frontend:
+	./scripts/check-frontend.sh
+
+# The Toolforge Node buildpack prunes dev deps as part of every deploy build;
+# do the same and check package-lock.json comes out unchanged. An npm version
+# skew between whoever generated the lockfile and the buildpack's bundled npm
+# would otherwise rewrite it, dirtying the tree and stamping release builds
+# "-modified" (see the fix in #103). Also assumes "frontend" already ran.
+lockfile-check:
+	NODE_ENV=production npm prune
+	git diff --exit-code -- package-lock.json
 
 # Run the webserver locally without object storage (/download/ returns 404).
 dev: frontend
@@ -29,19 +47,14 @@ dev: frontend
 # without a prior "npm run build" (cmd/webserver then tests against the
 # internal/webui/dist placeholder).
 test:
-	go test ./...
+	go test -v ./...
 
 lint:
 	go vet ./...
 
-# Everything CI enforces, for a pre-push check: the frontend size/supply-chain
-# guards, the buildpack's npm-prune step (must not touch package-lock.json —
-# an npm version skew would, making release builds stamp "-modified"), then
-# lint/build/test. Restores dev dependencies pruned along the way.
-ci: frontend
-	./scripts/check-frontend.sh
-	NODE_ENV=production npm prune
-	git diff --exit-code -- package-lock.json
+# Everything CI enforces, for a pre-push check. Restores the dev dependencies
+# that lockfile-check's "npm prune" removed.
+ci: frontend check-frontend lockfile-check
 	npm ci
 	$(MAKE) lint
 	go build ./...
