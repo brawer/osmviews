@@ -4,7 +4,7 @@
 # Convenience targets for local parity with CI and the Toolforge buildpack.
 # See frontend/README.md, cmd/webserver/README.md, cmd/osmviews-builder/README.md.
 
-.PHONY: build webserver builder frontend dev test check clean
+.PHONY: build webserver builder frontend dev test lint ci clean
 
 # Build both binaries, matching CI's "Build" step.
 build: webserver builder
@@ -25,21 +25,27 @@ frontend:
 dev: frontend
 	go run ./cmd/webserver --dev --port 8080
 
+# Go tests only — what CI's "Test" step runs. Works on a fresh checkout even
+# without a prior "npm run build" (cmd/webserver then tests against the
+# internal/webui/dist placeholder).
 test:
 	go test ./...
 
-# Everything CI enforces, for a pre-push check. Mirrors the Toolforge buildpack
-# sequence (npm ci -> build -> prune); the prune must not touch package-lock.json
-# (an npm version skew would, making release builds stamp "-modified"). Restores
-# dev dependencies afterwards.
-check: frontend
+lint:
+	go vet ./...
+
+# Everything CI enforces, for a pre-push check: the frontend size/supply-chain
+# guards, the buildpack's npm-prune step (must not touch package-lock.json —
+# an npm version skew would, making release builds stamp "-modified"), then
+# lint/build/test. Restores dev dependencies pruned along the way.
+ci: frontend
 	./scripts/check-frontend.sh
 	NODE_ENV=production npm prune
 	git diff --exit-code -- package-lock.json
 	npm ci
-	go vet ./...
+	$(MAKE) lint
 	go build ./...
-	go test ./...
+	$(MAKE) test
 
 clean:
 	rm -rf webserver builder internal/webui/dist/assets internal/webui/dist/index.html
