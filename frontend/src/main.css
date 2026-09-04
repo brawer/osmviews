@@ -1,0 +1,34 @@
+/*
+SPDX-FileCopyrightText: 2026 Sascha Brawer <sascha@brawer.ch>
+SPDX-License-Identifier: MIT
+*/
+
+:root {
+  color-scheme: light dark;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.5;
+}
+
+body {
+  margin: 0;
+}
+
+main {
+  padding: 2rem;
+  max-width: 42rem;
+}
+
+h1 small {
+  font-size: 0.5em;
+  font-weight: normal;
+  vertical-align: middle;
+  opacity: 0.6;
+}
+
+.osm {
+  color: #ff0088;
+}
+
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}

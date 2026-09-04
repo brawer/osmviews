@@ -8,13 +8,17 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 
 	"github.com/brawer/osmviews/v2/internal/version"
+	"github.com/brawer/osmviews/v2/internal/webui"
 	//"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -62,6 +66,7 @@ func main() {
 	http.HandleFunc("/robots.txt", server.HandleRobotsTxt)
 	http.Handle("/metrics", promhttp.Handler())
 	http.HandleFunc("/download/", server.HandleDownload)
+	http.HandleFunc("/beta/", server.HandleBeta)
 	log.Printf("%s listening for HTTP requests on port %d", ServerVersion, *port)
 	err = http.ListenAndServe(":"+strconv.Itoa(*port), nil)
 	cancel()
@@ -219,6 +224,77 @@ func stripLineBreaks(s string) string {
 	return s
 }
 
+// betaFS holds the built frontend single-page app (internal/webui/dist),
+// embedded at compile time. On a checkout where the frontend has not been
+// built it contains only a placeholder and no index.html.
+var betaFS = webui.FS()
+
+// betaNotBuiltHTML is served for /beta/ when the binary was built without
+// running "npm run build" first (e.g. a bare `go run ./cmd/webserver`).
+const betaNotBuiltHTML = `<!doctype html><meta charset="utf-8">` +
+	`<title>OSMViews beta</title>` +
+	`<p>The <code>/beta/</code> app is not built into this binary. ` +
+	`Run <code>npm ci &amp;&amp; npm run build</code>, then rebuild.`
+
+// HandleBeta serves the embedded single-page app under /beta/. Content-hashed
+// assets are cached hard; every other path falls back to index.html so the
+// client-side router can handle it. The whole tree is marked noindex while the
+// app is a moving target (there is also a Disallow in robots.txt).
+func (ws *Webserver) HandleBeta(w http.ResponseWriter, r *http.Request) {
+	h := w.Header()
+	h.Set("Server", ServerVersion)
+	h.Set("X-Robots-Tag", "noindex")
+
+	name := strings.TrimPrefix(r.URL.Path, "/beta/")
+	if name == "" || name == "index.html" || !fs.ValidPath(name) {
+		ws.serveBetaIndex(w)
+		return
+	}
+
+	f, err := betaFS.Open(name)
+	if err != nil {
+		// A path with no file extension is a client-side route: serve the app.
+		// A missing asset (has an extension) is a genuine 404.
+		if path.Ext(name) == "" {
+			ws.serveBetaIndex(w)
+		} else {
+			http.NotFound(w, r)
+		}
+		return
+	}
+	defer f.Close()
+
+	info, err := f.Stat()
+	if err != nil || info.IsDir() {
+		ws.serveBetaIndex(w)
+		return
+	}
+
+	if strings.HasPrefix(name, "assets/") {
+		h.Set("Cache-Control", "public, max-age=31536000, immutable")
+	} else {
+		h.Set("Cache-Control", "no-cache")
+	}
+
+	// embed.FS files implement io.ReadSeeker, which http.ServeContent needs.
+	if rs, ok := f.(io.ReadSeeker); ok {
+		http.ServeContent(w, r, info.Name(), info.ModTime(), rs)
+		return
+	}
+	http.Error(w, "internal error", http.StatusInternalServerError)
+}
+
+func (ws *Webserver) serveBetaIndex(w http.ResponseWriter) {
+	h := w.Header()
+	h.Set("Content-Type", "text/html; charset=utf-8")
+	h.Set("Cache-Control", "no-cache")
+	if b, err := fs.ReadFile(betaFS, "index.html"); err == nil {
+		w.Write(b)
+		return
+	}
+	w.Write([]byte(betaNotBuiltHTML))
+}
+
 // HandleRobotsTxt sends a constant robots.txt file back to the
 // client, allowing web crawlers to access our entire site.  If we
 // didn't handle /robots.txt ourselves, Wikimedia's proxy would inject
@@ -228,6 +304,8 @@ func (ws *Webserver) HandleRobotsTxt(w http.ResponseWriter, r *http.Request) {
 	h.Set("Server", ServerVersion)
 
 	// https://wikitech.wikimedia.org/wiki/Help:Toolforge/Web#/robots.txt
+	// /beta/ is the in-progress web app: keep it out of search indexes for now
+	// (HandleBeta also sends X-Robots-Tag: noindex).
 	h.Set("Content-Type", "text/plain")
-	fmt.Fprintf(w, "%s", "User-Agent: *\nAllow: /\n")
+	fmt.Fprintf(w, "%s", "User-Agent: *\nAllow: /\nDisallow: /beta/\n")
 }
