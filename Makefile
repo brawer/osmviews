@@ -2,14 +2,20 @@
 # SPDX-License-Identifier: MIT
 #
 # Convenience targets for local parity with CI and the Toolforge buildpack.
-# See frontend/README.md and cmd/webserver/README.md.
+# See frontend/README.md, cmd/webserver/README.md, cmd/osmviews-builder/README.md.
 
-.PHONY: webserver frontend dev test check clean
+.PHONY: build webserver builder frontend dev test check clean
+
+# Build both binaries, matching CI's "Build" step.
+build: webserver builder
 
 # Build the webserver the way the deploy does: frontend first, then embed it
 # into the Go binary via //go:embed.
 webserver: frontend
 	go build -o webserver ./cmd/webserver
+
+builder:
+	go build -o builder ./cmd/osmviews-builder
 
 frontend:
 	npm ci
@@ -36,4 +42,4 @@ check: frontend
 	go test ./...
 
 clean:
-	rm -rf webserver internal/webui/dist/assets internal/webui/dist/index.html
+	rm -rf webserver builder internal/webui/dist/assets internal/webui/dist/index.html
