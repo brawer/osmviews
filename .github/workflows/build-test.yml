@@ -15,6 +15,21 @@ jobs:
     steps:
     - name: Check out source code
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+    - name: Install Node.js
+      uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      with:
+        node-version-file: .node-version
+        cache: npm
+    - name: Build the frontend
+      # cmd/webserver embeds internal/webui/dist via //go:embed. The Toolforge
+      # deploy build produces it the same way, with the Node buildpack running
+      # "npm run build" before the Go build (see toolforge.yaml, issue #100).
+      run: |
+          npm ci
+          npm run build
+          test -f internal/webui/dist/index.html
+          # No built assets may be tracked in git (dist/.gitignore keeps them out).
+          test -z "$(git status --porcelain internal/webui/dist)"
     - name: Install Go
       uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
       with:
