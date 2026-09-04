@@ -8,4 +8,4 @@ package version
 // Release is the released version a build was cut from. release-please sets
 // it in the release commit (see RELEASING.md); it is "" on any other build,
 // in which case Resolve falls back to the source revision.
-const Release = "0.1.4" // x-release-please-version
+const Release = "0.1.5" // x-release-please-version
