@@ -15,13 +15,21 @@ npm run dev       # Vite dev server with HMR (serves /beta/ on :5173)
 npm run build     # → internal/webui/dist/, embedded into the Go binary
 ```
 
-To see it served by the actual Go webserver (cache headers, SPA fallback, the
-untouched `/` page) without S3 credentials:
+The repo-root `Makefile` wraps the common flows:
 
 ```sh
-npm run build
-go run ./cmd/webserver --dev --port 8080   # /download/ 404s; /, /beta/, /robots.txt work
+make webserver    # npm ci + npm run build + go build -o webserver ./cmd/webserver
+make dev          # build the frontend, then run the webserver with --dev on :8080
+make check        # everything CI enforces (see below), for a pre-push check
 ```
+
+`make dev` / `--dev` runs the actual Go webserver without S3 credentials
+(`/download/` 404s; `/`, `/beta/`, `/robots.txt` work), so you can check cache
+headers, the SPA fallback and the untouched `/` page.
+
+CI (and `make check`) run `scripts/check-frontend.sh` after the build: a gzipped
+JS size budget, `npm audit --audit-level=high`, and a dependency-licence denylist
+(no GPL/AGPL/LGPL/SSPL).
 
 `npm run build` output is **not** checked in (see
 [`../internal/webui/dist/.gitignore`](../internal/webui/dist/.gitignore)); it is
