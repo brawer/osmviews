@@ -21,14 +21,17 @@ The repo-root `Makefile` wraps the common flows:
 make build        # webserver + builder — everything CI's "Build" step builds
 make webserver    # npm ci + npm run build + go build -o webserver ./cmd/webserver
 make dev          # build the frontend, then run the webserver with --dev on :8080
-make check        # everything CI enforces (see below), for a pre-push check
+make test         # go test ./... — what CI's "Test" step runs
+make lint         # go vet ./...
+make ci           # everything CI enforces (see below) — build+test+lint plus
+                   # the frontend guards; a pre-push check
 ```
 
 `make dev` / `--dev` runs the actual Go webserver without S3 credentials
 (`/download/` 404s; `/`, `/beta/`, `/robots.txt` work), so you can check cache
 headers, the SPA fallback and the untouched `/` page.
 
-CI (and `make check`) run `scripts/check-frontend.sh` after the build:
+CI (and `make ci`) run `scripts/check-frontend.sh` after the build:
 
 - a gzipped JS size budget,
 - `npm audit --audit-level=high` (known vulnerabilities),
