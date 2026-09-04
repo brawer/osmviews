@@ -5,11 +5,13 @@ package main
 
 import (
 	"io"
+	"io/fs"
 	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -258,5 +260,93 @@ func TestWebserver_DownloadBOMContentType(t *testing.T) {
 	}
 	if header.Get("Link") != "" {
 		t.Errorf("BOM response should carry no Link header, got %q", header.Get("Link"))
+	}
+}
+
+// sendToHandler drives an arbitrary Webserver handler, like sendRequest does for
+// HandleDownload.
+func sendToHandler(handler http.HandlerFunc, method, path string) (int, http.Header, []byte) {
+	req := httptest.NewRequest(method, path, nil)
+	w := httptest.NewRecorder()
+	handler(w, req)
+	res := w.Result()
+	defer res.Body.Close()
+	body, _ := io.ReadAll(res.Body)
+	return res.StatusCode, res.Header, body
+}
+
+// The test binary is usually built without running "npm run build", so
+// internal/webui/dist holds only the placeholder and HandleBeta serves the
+// "not built" page. These assertions hold either way.
+func TestWebserver_Beta(t *testing.T) {
+	status, header, body := sendToHandler(testWebserver.HandleBeta, "GET", "/beta/")
+	if status != http.StatusOK {
+		t.Errorf("status = %d, want 200", status)
+	}
+	if got := header.Get("X-Robots-Tag"); got != "noindex" {
+		t.Errorf("X-Robots-Tag = %q, want noindex", got)
+	}
+	if got := header.Get("Server"); got == "" {
+		t.Error("Server header not set")
+	}
+	if ct := header.Get("Content-Type"); !strings.HasPrefix(ct, "text/html") {
+		t.Errorf("Content-Type = %q, want text/html", ct)
+	}
+	if len(body) == 0 {
+		t.Error("empty body")
+	}
+}
+
+func TestWebserver_BetaClientRouteFallsBackToIndex(t *testing.T) {
+	// An unknown path with no extension is a client-side route: serve the app.
+	status, header, _ := sendToHandler(testWebserver.HandleBeta, "GET", "/beta/some/deep/route")
+	if status != http.StatusOK {
+		t.Errorf("status = %d, want 200", status)
+	}
+	if got := header.Get("X-Robots-Tag"); got != "noindex" {
+		t.Errorf("X-Robots-Tag = %q, want noindex", got)
+	}
+}
+
+func TestWebserver_BetaMissingAssetIs404(t *testing.T) {
+	status, _, _ := sendToHandler(testWebserver.HandleBeta, "GET", "/beta/assets/app-deadbeef.js")
+	if status != http.StatusNotFound {
+		t.Errorf("status = %d, want 404", status)
+	}
+}
+
+// When the frontend has actually been built (CI, or a local "npm run build"),
+// a content-hashed asset must be served with a long, immutable Cache-Control.
+func TestWebserver_BetaAssetIsCachedHard(t *testing.T) {
+	entries, err := fs.ReadDir(betaFS, "assets")
+	if err != nil {
+		t.Skip("frontend not built into this binary; skipping asset check")
+	}
+	var asset string
+	for _, e := range entries {
+		if !e.IsDir() {
+			asset = e.Name()
+			break
+		}
+	}
+	if asset == "" {
+		t.Skip("no built assets")
+	}
+	status, header, _ := sendToHandler(testWebserver.HandleBeta, "GET", "/beta/assets/"+asset)
+	if status != http.StatusOK {
+		t.Fatalf("status = %d, want 200", status)
+	}
+	if got := header.Get("Cache-Control"); got != "public, max-age=31536000, immutable" {
+		t.Errorf("Cache-Control = %q, want immutable", got)
+	}
+	if got := header.Get("X-Robots-Tag"); got != "noindex" {
+		t.Errorf("X-Robots-Tag = %q, want noindex", got)
+	}
+}
+
+func TestWebserver_RobotsTxtDisallowsBeta(t *testing.T) {
+	_, _, body := sendToHandler(testWebserver.HandleRobotsTxt, "GET", "/robots.txt")
+	if !strings.Contains(string(body), "Disallow: /beta/") {
+		t.Errorf("robots.txt = %q, want it to disallow /beta/", string(body))
 	}
 }

@@ -7,3 +7,8 @@
 /keys
 /logs
 /webserver
+
+# Frontend (see package.json, internal/webui). The build output under
+# internal/webui/dist/ is ignored by internal/webui/dist/.gitignore.
+/node_modules
+/frontend/dist

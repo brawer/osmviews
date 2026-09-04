@@ -1,0 +1,8 @@
+# SPDX-FileCopyrightText: 2026 Sascha Brawer <sascha@brawer.ch>
+# SPDX-License-Identifier: MIT
+#
+# The built single-page app (Vite output — locally, in CI, and in the Toolforge
+# buildpack build) is not checked in. This file keeps the directory present so
+# //go:embed always has something to embed.
+*
+!.gitignore
