@@ -23,6 +23,26 @@ printf '    %-32s %8s B gz   (budget %s)\n' "total" "$total" "$budget"
 echo "==> npm audit (fail on high or critical)"
 npm audit --audit-level=high
 
+echo "==> npm registry signatures and provenance attestations"
+npm audit signatures
+
+echo "==> dependency sources (must all come from the npm registry)"
+npm query "*" | node -e '
+let d = "";
+process.stdin.on("data", (c) => (d += c)).on("end", () => {
+  const pkgs = JSON.parse(d);
+  const bad = pkgs
+    .filter((p) => p.name !== "osmviews-webapp")
+    .filter((p) => !(p.resolved || "").startsWith("https://registry.npmjs.org/"));
+  if (bad.length) {
+    console.error("FAIL: dependencies not resolved from registry.npmjs.org:");
+    for (const p of bad) console.error("    " + p.name + "@" + p.version + "  " + (p.resolved || "(no resolved URL)"));
+    process.exit(1);
+  }
+  console.log("    " + pkgs.length + " packages, all from the npm registry");
+});
+'
+
 echo "==> npm dependency licenses"
 npm query "*" | node -e '
 let d = "";
