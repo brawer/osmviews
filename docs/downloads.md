@@ -56,20 +56,16 @@ curl --etag-compare etag.txt --etag-save etag.txt \
 ## Which version am I looking at?
 
 The bill of materials is the single source of truth for what a download is and
-how it was made. To get the BOM for a GeoTIFF you just fetched, read the `Link`
-header on that same HTTP response (do not make a separate request for it — a
-fresh one could land on a newer build):
+how it was made. The GeoTIFF carries its version date in the `DateTime` tag
+(306), and the BOM is named after that same date:
 
 ```
-Link: </download/osmviews-20260830.cdx.json>; rel="describedby";
-      type="application/vnd.cyclonedx+json"
+DateTime (306): 2026:08:30 00:00:00  →  /download/osmviews-20260830.cdx.json
 ```
 
-If provenance matters to you, fetch the BOM at download time and keep it next to
-the file; don't rely on recovering it later. As a last resort, an orphaned
-GeoTIFF's `DateTime` tag (306) holds the version date — `2026:08:30 00:00:00` →
-`osmviews-20260830.cdx.json` — but that only works while the build is still among
-the three most recent.
+If provenance matters to you, fetch the BOM right after the GeoTIFF and keep it
+next to the file; the dated BOM URL is immutable, but only the three most recent
+builds are retained, so don't rely on recovering it later.
 
 
 ## The bill of materials
@@ -95,16 +91,15 @@ A [CycloneDX](https://cyclonedx.org) 1.7 document describing one dated GeoTIFF:
 ## Verifying a download
 
 1. `GET /download/osmviews.tiff`
-2. read the `Link` header from that response → BOM URL
+2. read the `DateTime` tag (306) → `osmviews-<YYYYMMDD>.cdx.json` → BOM URL
 3. `GET` the BOM
 4. assert `sha256(step 1 bytes) == metadata.component.hashes["SHA-256"]`
 
 Fetch the BOM right after the GeoTIFF, while the build is still within the
-roughly three-week retention window. Then step 4 always passes — the `Link`
-header ships with the download and the BOM is written before the GeoTIFF, so
-both come from the same build. It fails only if the pair drifted apart (a
-download resumed across a weekly update, or a caching proxy mixing builds); if
-so, re-download and retry.
+roughly three-week retention window. The BOM is written before the GeoTIFF, so
+if both come from the same build step 4 passes. It fails only if the pair
+drifted apart (a download resumed across a weekly update, or a caching proxy
+mixing builds); if so, re-download and retry.
 
 
 ## Recording OSMViews in your data BOM

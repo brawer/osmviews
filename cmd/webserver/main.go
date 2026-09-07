@@ -198,15 +198,6 @@ func (ws *Webserver) HandleDownload(w http.ResponseWriter, req *http.Request) {
 		h.Set("ETag", fmt.Sprintf(`"%s"`, c.ETag))
 		h.Set("Content-Type", c.ContentType)
 		h.Set("Access-Control-Allow-Origin", "*")
-		// Point consumers at the CycloneDX BOM for this exact GeoTIFF
-		// version, so a supply-chain client need not parse a TIFF tag.
-		if c.Version != "" && strings.HasSuffix(path, ".tiff") {
-			stem := strings.TrimSuffix(path, ".tiff")
-			h.Set("Link", fmt.Sprintf(
-				`</download/%s-%s.cdx.json>; rel="describedby"; type="%s"`,
-				stem, c.Version, bomContentType))
-			h.Set("Access-Control-Expose-Headers", "ETag, Link")
-		}
 		http.ServeContent(w, req, "", c.LastModified, c)
 
 	case http.MethodOptions: // CORS pre-flight

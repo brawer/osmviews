@@ -233,20 +233,6 @@ func makeTestWebserver() *Webserver {
 	return &Webserver{storage: storage}
 }
 
-func TestWebserver_DownloadGeoTIFFLinksBOM(t *testing.T) {
-	_, header, _, err := sendRequest("GET", "/download/osmviews.tiff", make(http.Header))
-	if err != nil {
-		t.Fatal(err)
-	}
-	want := `</download/osmviews-20260830.cdx.json>; rel="describedby"; type="application/vnd.cyclonedx+json"`
-	if got := header.Get("Link"); got != want {
-		t.Errorf("Link header = %q, want %q", got, want)
-	}
-	if got := header.Get("Access-Control-Expose-Headers"); got != "ETag, Link" {
-		t.Errorf("Access-Control-Expose-Headers = %q, want %q", got, "ETag, Link")
-	}
-}
-
 func TestWebserver_DownloadBOMContentType(t *testing.T) {
 	status, header, _, err := sendRequest("GET", "/download/osmviews-20260830.cdx.json", make(http.Header))
 	if err != nil {
@@ -257,9 +243,6 @@ func TestWebserver_DownloadBOMContentType(t *testing.T) {
 	}
 	if got := header.Get("Content-Type"); got != "application/vnd.cyclonedx+json" {
 		t.Errorf("Content-Type = %q, want application/vnd.cyclonedx+json", got)
-	}
-	if header.Get("Link") != "" {
-		t.Errorf("BOM response should carry no Link header, got %q", header.Get("Link"))
 	}
 }
 
