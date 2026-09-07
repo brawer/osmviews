@@ -112,7 +112,7 @@ func (s *Storage) Reload(ctx context.Context) error {
 	})
 	// The GeoTIFF is served under a de-dated name, "osmviews.tiff", that
 	// always points at the most recent version. Every auxiliary file (the
-	// statistics JSON, the CycloneDX BOM, …) is served only under its dated
+	// CycloneDX BOM, and any later sibling) is served only under its dated
 	// basename, "osmviews-<...>-<YYYYMMDD>.<ext>", so its URL is immutable and
 	// names the exact GeoTIFF it belongs to. The three most recent of each
 	// auxiliary family are kept, matching the builder's own retention.

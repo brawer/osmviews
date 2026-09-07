@@ -36,8 +36,8 @@ Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
 The latest raster is always at
 **<https://osmviews.toolforge.org/download/osmviews.tiff>** — a Cloud-Optimized
 GeoTIFF, updated weekly. Each build also publishes a
-[CycloneDX](https://cyclonedx.org) bill of materials and a statistics file,
-addressed by date.
+[CycloneDX](https://cyclonedx.org) bill of materials, addressed by date; the
+pixel-value histogram is embedded in the GeoTIFF.
 
 See [`docs/downloads.md`](docs/downloads.md) for the URLs, how to check for
 updates without re-downloading, the integrity digests, how to tie a download

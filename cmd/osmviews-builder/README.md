@@ -7,9 +7,9 @@ SPDX-License-Identifier: MIT
 
 The `builder` tool is a cronjob that computes the weekly GeoTIFF from
 OpenStreetMap tile-log impressions. Each run publishes, by date, the raster
-(`osmviews-<date>.tiff`), a statistics file (`osmviews-stats-<date>.json`) and
-a CycloneDX bill of materials (`osmviews-<date>.cdx.json`); see
-[`docs/downloads.md`](../../docs/downloads.md).
+(`osmviews-<date>.tiff`) and a CycloneDX bill of materials
+(`osmviews-<date>.cdx.json`); the pixel-value histogram is embedded in the
+GeoTIFF itself. See [`docs/downloads.md`](../../docs/downloads.md).
 
 How it builds a globally complete, zoom-18 Cloud-Optimized GeoTIFF in bounded
 memory — the level-embedding tile key, the streaming per-period sort and

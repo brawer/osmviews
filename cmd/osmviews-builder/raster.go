@@ -125,6 +125,7 @@ type RasterWriter struct {
 	dataSize     uint64
 	zoom         uint8
 	maxValue     float32
+	hist         Histogram // pixel-value histogram of the main image; GDAL_METADATA tag (42112)
 	description  string    // ImageDescription tag (270)
 	dateTime     time.Time // DateTime tag (306); omitted if zero
 
@@ -173,19 +174,17 @@ func NewRasterWriter(path string, zoom uint8, meta TiffMetadata) (*RasterWriter,
 }
 
 func (w *RasterWriter) Write(r *Raster) error {
+	zoom, x, y := r.tile.ZoomXY()
+
 	// About 124K rasters are not strictly uniform, but they have only
 	// marginal differences in color. For those, we can save the effort
 	// of compression.
 	uniform := true
 	color := uint32(r.pixels[0] + 0.5)
 	for i := 0; i < len(r.pixels); i++ {
-		col := r.pixels[i]
-		if uint32(col+0.5) != color {
+		if uint32(r.pixels[i]+0.5) != color {
 			uniform = false
 			break
-		}
-		if col > w.maxValue {
-			w.maxValue = r.pixels[i]
 		}
 	}
 	if uniform {
@@ -199,15 +198,31 @@ func (w *RasterWriter) Write(r *Raster) error {
 	// QGIS can more easily visualize our GeoTIFF image when the pixel
 	// values have a somewhat linear distribution.
 	var logPixels [256 * 256]float32
+	var maxValue float32
 	for i := 0; i < 256*256; i++ {
+		if r.pixels[i] > maxValue {
+			maxValue = r.pixels[i]
+		}
 		logPixels[i] = float32(math.Log1p(float64(r.pixels[i])))
 	}
+	if maxValue > w.maxValue {
+		w.maxValue = maxValue
+	}
+
+	// The highest-resolution image's pixels feed the histogram embedded in
+	// the output GeoTIFF; overview levels are subsampled copies and do not
+	// count.
+	if zoom == w.zoom {
+		for _, v := range logPixels {
+			w.hist.Add(v, 1)
+		}
+	}
+
 	offset, size, err := w.compress(r.tile, logPixels[:])
 	if err != nil {
 		return err
 	}
 
-	zoom, x, y := r.tile.ZoomXY()
 	tileIndex := (1<<zoom)*y + x
 	w.tileOffsets[zoom][tileIndex] = uint32(offset)
 	w.tileByteCounts[zoom][tileIndex] = size
@@ -221,6 +236,14 @@ func (w *RasterWriter) Write(r *Raster) error {
 func (w *RasterWriter) WriteUniform(tile TileKey, color uint32) error {
 	zoom, x, y := tile.ZoomXY()
 	tileIndex := (1<<zoom)*y + x
+
+	// Count this tile's pixels in the embedded histogram before the
+	// data-sharing shortcut below can return early: every tile that reuses
+	// this color still contributes its 256×256 pixels to the main image.
+	if zoom == w.zoom {
+		w.hist.Add(float32(math.Log1p(float64(color))), 256*256)
+	}
+
 	if same, exists := w.uniformTiles[zoom][color]; exists {
 		w.tileOffsets[zoom][tileIndex] = w.tileOffsets[zoom][same]
 		w.tileByteCounts[zoom][tileIndex] = w.tileByteCounts[zoom][same]
@@ -396,6 +419,7 @@ func (w *RasterWriter) writeIFD(zoom uint8, f *os.File) error {
 		modelTiepoint   = 33922
 		geoKeyDirectory = 34735
 		geoAsciiParams  = 34737
+		gdalMetadata    = 42112
 
 		asciiFormat  = 2
 		shortFormat  = 3
@@ -468,6 +492,7 @@ func (w *RasterWriter) writeIFD(zoom uint8, f *os.File) error {
 		ifd = append(ifd, ifdEntry{geoAsciiParams, 0})
 		ifd = append(ifd, ifdEntry{sMinSampleValue, 0})
 		ifd = append(ifd, ifdEntry{sMaxSampleValue, 0})
+		ifd = append(ifd, ifdEntry{gdalMetadata, 0})
 	} else {
 		// 1 = subsampled low-resolution version of main image
 		// TIFF 6.0 specification, page 36
@@ -521,7 +546,7 @@ func (w *RasterWriter) writeIFD(zoom uint8, f *os.File) error {
 		case imageDescription:
 			desc := w.description
 			if desc == "" {
-				desc = "OpenStreetMap view density, in weekly user views per km2"
+				desc = "OpenStreetMap view density: ln(1 + weekly user views per km2) per pixel"
 			}
 			typ, count, value = writeASCII(desc)
 
@@ -566,6 +591,12 @@ func (w *RasterWriter) writeIFD(zoom uint8, f *os.File) error {
 			if _, err := extraBuf.Write(s); err != nil {
 				return err
 			}
+
+		case gdalMetadata:
+			// The pixel-value histogram, embedded as a GDAL Raster Attribute
+			// Table. 42112 is the highest tag we write, so writeASCII appends
+			// its (large) payload to extraBuf last. See histogram.go.
+			typ, count, value = writeASCII(w.hist.RATXML())
 
 		case tileOffsets:
 			typ, count, value = longFormat, numTiles, 0xdeadbeef

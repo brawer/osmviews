@@ -74,10 +74,7 @@ func main() {
 	date := lastDay.Format("20060102")
 	bucket := "osmviews"
 	localpath := filepath.Join(*workdir, fmt.Sprintf("osmviews-%s.tiff", date))
-	localStatsPath := filepath.Join(*workdir, fmt.Sprintf("osmviews-stats-%s.json", date))
-	localStatsPlotPath := filepath.Join(*workdir, fmt.Sprintf("osmviews-statsplot-%s.png", date))
 	remotepath := fmt.Sprintf("public/osmviews-%s.tiff", date)
-	remoteStatsPath := fmt.Sprintf("public/osmviews-stats-%s.json", date)
 	localBomPath := filepath.Join(*workdir, fmt.Sprintf("osmviews-%s.cdx.json", date))
 	remoteBomPath := fmt.Sprintf("public/osmviews-%s.cdx.json", date)
 
@@ -87,13 +84,11 @@ func main() {
 	if storage != nil {
 		_, err := storage.Stat(ctx, bucket, remotepath)
 		hasGeoTiff := err == nil
-		_, err = storage.Stat(ctx, bucket, remoteStatsPath)
-		hasStats := err == nil
 		_, err = storage.Stat(ctx, bucket, remoteBomPath)
 		hasBom := err == nil
-		if hasGeoTiff && hasStats && hasBom {
-			logger.Printf("already in storage: %s/%s, %s/%s and %s/%s; nothing to do",
-				bucket, remotepath, bucket, remoteStatsPath, bucket, remoteBomPath)
+		if hasGeoTiff && hasBom {
+			logger.Printf("already in storage: %s/%s and %s/%s; nothing to do",
+				bucket, remotepath, bucket, remoteBomPath)
 			return
 		}
 	}
@@ -103,8 +98,8 @@ func main() {
 	// and the BOM's recorded hashes stay valid.
 	meta := TiffMetadata{
 		Description: fmt.Sprintf(
-			"OpenStreetMap view density, in weekly user views per km2. "+
-				"Tile logs %s..%s. https://osmviews.toolforge.org",
+			"OpenStreetMap view density: ln(1 + weekly user views per km2) "+
+				"per pixel. Tile logs %s..%s. https://osmviews.toolforge.org",
 			logs.firstDay.Format("2006-01-02"), logs.lastDay.Format("2006-01-02")),
 		DateTime: logs.lastDay,
 	}
@@ -112,58 +107,42 @@ func main() {
 		logger.Fatalf("painting %s: %v", localpath, err)
 	}
 
-	logger.Printf("computing statistics from %s", localpath)
-	if err := BuildStats(localpath, localStatsPath, localStatsPlotPath); err != nil {
-		logger.Fatalf("computing statistics: %v", err)
-	}
-
 	// Build the CycloneDX Bill of Materials for the GeoTIFF: the exact bytes
-	// (SHA-256/512) and the software revision that produced them, plus a
-	// reference to the sibling statistics JSON. See bom.go and
-	// https://github.com/brawer/osmviews/issues/87.
+	// (SHA-256/512) and the software revision that produced them. See bom.go
+	// and https://github.com/brawer/osmviews/issues/87.
 	sha256hex, sha512hex, err := hashFile(localpath)
 	if err != nil {
 		logger.Fatalf("hashing %s: %v", localpath, err)
 	}
-	statsSHA256, statsSHA512, err := hashFile(localStatsPath)
-	if err != nil {
-		logger.Fatalf("hashing %s: %v", localStatsPath, err)
-	}
 	revision, modified := version.Revision()
 	if err := writeBOM(localBomPath, bomInputs{
-		Date:        logs.lastDay,
-		FirstDay:    logs.firstDay,
-		Weeks:       len(logs.readers),
-		SHA256:      sha256hex,
-		SHA512:      sha512hex,
-		Software:    SoftwareVersion,
-		Revision:    revision,
-		Modified:    modified,
-		Release:     version.Release,
-		MaxZoom:     maxZoom,
-		StatsSHA256: statsSHA256,
-		StatsSHA512: statsSHA512,
+		Date:     logs.lastDay,
+		FirstDay: logs.firstDay,
+		Weeks:    len(logs.readers),
+		SHA256:   sha256hex,
+		SHA512:   sha512hex,
+		Software: SoftwareVersion,
+		Revision: revision,
+		Modified: modified,
+		Release:  version.Release,
+		MaxZoom:  maxZoom,
 	}); err != nil {
 		logger.Fatalf("building BOM %s: %v", localBomPath, err)
 	}
 
 	// Upload to storage, and garbage-collect old files. The GeoTIFF goes
 	// last, because it is the entry point a consumer starts from: its Link
-	// header points at the BOM, and the BOM references the statistics JSON.
-	// Uploading referenced-before-referencer means whatever a consumer can
-	// reach is already there.
+	// header points at the BOM. Uploading referenced-before-referencer means
+	// whatever a consumer can reach is already there.
 	if storage != nil {
-		if err := storage.PutFile(ctx, bucket, remoteStatsPath, localStatsPath, "application/json"); err != nil {
-			logger.Fatalf("uploading %s/%s: %v", bucket, remoteStatsPath, err)
-		}
 		if err := storage.PutFile(ctx, bucket, remoteBomPath, localBomPath, "application/vnd.cyclonedx+json"); err != nil {
 			logger.Fatalf("uploading %s/%s: %v", bucket, remoteBomPath, err)
 		}
 		if err := storage.PutFile(ctx, bucket, remotepath, localpath, "image/tiff"); err != nil {
 			logger.Fatalf("uploading %s/%s: %v", bucket, remotepath, err)
 		}
-		logger.Printf("uploaded %s/%s, %s/%s and %s/%s; done, %s",
-			bucket, remoteStatsPath, bucket, remoteBomPath, bucket, remotepath, memStats())
+		logger.Printf("uploaded %s/%s and %s/%s; done, %s",
+			bucket, remoteBomPath, bucket, remotepath, memStats())
 
 		if err := Cleanup(storage); err != nil {
 			logger.Fatalf("garbage-collecting old files in storage: %v", err)
