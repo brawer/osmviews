@@ -39,6 +39,8 @@ func TestCleanup(t *testing.T) {
 		for _, p := range []struct{ pattern, contentType string }{
 			{"public/osmviews-%s.tiff", "image/tiff"},
 			{"public/osmviews-%s.cdx.json", "application/vnd.cyclonedx+json"},
+			// The retired statistics sidecar: Cleanup now purges every one
+			// (keep: 0), so none of these appear in want below.
 			{"public/osmviews-stats-%s.json", "application/json"},
 		} {
 			path := fmt.Sprintf(p.pattern, date)
@@ -141,9 +143,6 @@ func TestCleanup(t *testing.T) {
 		"public/osmviews-20220109.cdx.json",
 		"public/osmviews-20220109.tiff",
 		"public/osmviews-not-matching-pattern.txt",
-		"public/osmviews-stats-20211226.json",
-		"public/osmviews-stats-20220102.json",
-		"public/osmviews-stats-20220109.json",
 		"public/quxfoo-20210830.csv.gz",
 	}
 	if strings.Join(got, "|") != strings.Join(want, "|") {

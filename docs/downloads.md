@@ -5,21 +5,36 @@ SPDX-License-Identifier: MIT
 
 # Downloads & provenance
 
-Every weekly build publishes three files. The GeoTIFF has a stable URL that
-always serves the newest version; the auxiliary files are addressed by date so
-that a URL names the exact GeoTIFF it belongs to.
+Every weekly build publishes two files. The GeoTIFF has a stable URL that always
+serves the newest version; the bill of materials is addressed by date so that a
+URL names the exact GeoTIFF it belongs to.
 
 | File | URL | Format | Retention |
 |---|---|---|---|
 | Raster | `https://osmviews.toolforge.org/download/osmviews.tiff` | Cloud-Optimized GeoTIFF, EPSG:3857, zoom 0–18, ~580 MB | latest only |
 | Bill of materials | `…/download/osmviews-<YYYYMMDD>.cdx.json` | [CycloneDX](https://cyclonedx.org) 1.7 JSON | 3 most recent |
-| Statistics | `…/download/osmviews-stats-<YYYYMMDD>.json` | ad-hoc JSON (rank/value distribution) | 3 most recent |
 
 `<YYYYMMDD>` is the last day of the most recent tile-log week that went into the
 build — the same date the GeoTIFF carries in its `DateTime` tag.
 
-Only the three most recent builds are kept. If you need provenance or statistics
-that outlive that window, copy the files you used into your own storage.
+Only the three most recent bills of materials are kept. If you need provenance
+that outlives that window, copy the file you used into your own storage.
+
+
+## Pixel values and histogram
+
+Each pixel holds `ln(1 + weekly user views per km²)` — a logarithmic view
+density, not raw views. The natural-log compression keeps the value range
+roughly linear, which is what makes a plain grayscale stretch in QGIS legible;
+undo it with `expm1(pixel)` to get views per km².
+
+The value histogram travels inside the GeoTIFF, in the `GDAL_METADATA` tag
+(42112), as a band-1 Raster Attribute Table with linear binning: buckets
+1/16 wide in ln space, a `min`/`max` bound and a pixel `count` per bucket.
+GDAL 3.12+ and a recent QGIS expose it via `GetDefaultRAT()`; older readers
+ignore the tag and the raster still opens. Bucket 0 holds every pixel whose
+density rounds to zero — most of the planet — so plot the counts on a log
+axis.
 
 
 ## Checking for updates
@@ -63,8 +78,8 @@ A [CycloneDX](https://cyclonedx.org) 1.7 document describing one dated GeoTIFF:
 
 - `metadata.component` — the GeoTIFF: `version` (ISO date), `hashes` (SHA-256 and
   SHA-512 of the exact bytes), a `pkg:generic/osmviews@<date>` purl with
-  `checksum` and `download_url` qualifiers, and `externalReferences` — including
-  one of type `other` pointing at the dated statistics JSON, with its digests.
+  `checksum` and `download_url` qualifiers, and `externalReferences` for its
+  distribution, website, and source.
 - `metadata.tools.components[0]` — `osmviews-builder`, with its `pkg:github`
   purl (resolved to the full source revision), license, and build string.
 - `components[0]` — the OpenStreetMap tile logs the GeoTIFF is derived from
@@ -90,9 +105,6 @@ header ships with the download and the BOM is written before the GeoTIFF, so
 both come from the same build. It fails only if the pair drifted apart (a
 download resumed across a weekly update, or a caching proxy mixing builds); if
 so, re-download and retry.
-
-Verify the statistics JSON the same way, against the `hashes` on its
-`externalReference` in the BOM.
 
 
 ## Recording OSMViews in your data BOM

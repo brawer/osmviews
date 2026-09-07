@@ -21,6 +21,7 @@ type TiffReader struct {
 	maxValue                                       float32
 	imageDescription                               string // TIFF tag 270
 	dateTime                                       string // TIFF tag 306
+	gdalMetadata                                   string // TIFF tag 42112
 }
 
 func NewTiffReader(r io.ReaderAt) (*TiffReader, error) {
@@ -103,6 +104,13 @@ func (t *TiffReader) readFirstIFD() error {
 		case 306: // DateTime
 			if s, err := t.readASCII(count, value); err == nil {
 				t.dateTime = s
+			} else {
+				return err
+			}
+
+		case 42112: // GDAL_METADATA
+			if s, err := t.readASCII(count, value); err == nil {
+				t.gdalMetadata = s
 			} else {
 				return err
 			}

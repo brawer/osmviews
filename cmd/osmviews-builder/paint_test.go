@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -73,6 +74,69 @@ func TestPaint_NoMetadata(t *testing.T) {
 	}
 	if r.dateTime != "" {
 		t.Errorf("DateTime = %q, want empty (tag omitted)", r.dateTime)
+	}
+}
+
+// TestPaint_Histogram checks that the painted GeoTIFF carries the pixel-value
+// histogram in its GDAL_METADATA tag, that it is a well-formed linear-binning
+// Raster Attribute Table, and that its bucket counts add up to every pixel of
+// the main image (bucket 0, holding the unviewed world, dominates).
+func TestPaint_Histogram(t *testing.T) {
+	const zoom = 11 // pixel zoom; main image is 2^zoom pixels on a side
+	readers := []io.Reader{strings.NewReader("3/1/1 3\n18/137341/91897 1\n")}
+	path := filepath.Join(t.TempDir(), "hist.tif")
+	if err := paint(path, zoom, readers, nil, TiffMetadata{}, context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	f, err := os.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	r, err := NewTiffReader(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	md := r.gdalMetadata
+	for _, want := range []string{
+		`<GDALMetadata>`,
+		`name="DEFAULT_RASTER_ATTRIBUTE_TABLE" sample="0" role="rat"`,
+		`<GDALRasterAttributeTable Row0Min="0" BinSize="0.0625" tableType="athematic">`,
+		`<Usage>1</Usage>`, // PixelCount column
+	} {
+		if !strings.Contains(md, want) {
+			t.Fatalf("GDAL_METADATA tag missing %q; got:\n%s", want, md)
+		}
+	}
+
+	// Sum the <F> at the end of every <Row>: the count column.
+	var total int64
+	var bucket0 int64
+	rows := strings.Count(md, "<Row ")
+	for i, seg := range strings.Split(md, "<Row ")[1:] {
+		fs := strings.Split(seg, "<F>")
+		if len(fs) < 4 {
+			t.Fatalf("row %d has %d F values, want 3: %s", i, len(fs)-1, seg)
+		}
+		countStr := strings.SplitN(fs[3], "</F>", 2)[0]
+		n, err := strconv.ParseInt(countStr, 10, 64)
+		if err != nil {
+			t.Fatalf("row %d count %q: %v", i, countStr, err)
+		}
+		if i == 0 {
+			bucket0 = n
+		}
+		total += n
+	}
+
+	wantTotal := int64(1) << (2 * zoom) // (2^zoom)^2 pixels in the main image
+	if total != wantTotal {
+		t.Errorf("histogram counts sum to %d over %d buckets, want %d (every main-image pixel)", total, rows, wantTotal)
+	}
+	if bucket0 <= wantTotal/2 {
+		t.Errorf("bucket 0 holds %d of %d pixels; the unviewed world should dominate", bucket0, wantTotal)
 	}
 }
 

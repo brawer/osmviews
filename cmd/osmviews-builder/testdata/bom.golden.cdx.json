@@ -113,21 +113,6 @@
         {
           "type": "vcs",
           "url": "https://github.com/brawer/osmviews"
-        },
-        {
-          "type": "other",
-          "url": "https://osmviews.toolforge.org/download/osmviews-stats-20250830.json",
-          "comment": "Rank and value distribution statistics for this GeoTIFF.",
-          "hashes": [
-            {
-              "alg": "SHA-256",
-              "content": "736a113b5c16f549cb18f09ee9fc6dd578d06903edf4a9d1196897c2f218386a"
-            },
-            {
-              "alg": "SHA-512",
-              "content": "cf63ed644f07cc73b0d37f5598d6adcb754bfc69a053aad58e5ebaa9d1b9cfe484373f53d75eefe3e31959464c0f3a71b9ae9a8203e2c3d2e9b23aa342df10e3"
-            }
-          ]
         }
       ],
       "data": [
