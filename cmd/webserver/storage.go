@@ -22,6 +22,7 @@ import (
 
 type Storage struct {
 	client  storageClient
+	bucket  string
 	workdir string
 	mutex   sync.RWMutex
 	files   map[string]*localFile
@@ -65,27 +66,32 @@ type storageClient interface {
 	FGetObject(ctx context.Context, bucketName, objectName, filePath string, opts minio.GetObjectOptions) error
 }
 
-// NewStorage sets up a client for accessing S3-compatible object storage.
+// NewStorage sets up a client for the public S3-compatible bucket the CDN
+// serves, configured through PUBLIC_S3_ENDPOINT / _KEY / _SECRET / _BUCKET
+// (and an optional _REGION). Bunny's S3 gateway requires path-style addressing.
 func NewStorage(workdir string) (*Storage, error) {
 	if err := os.MkdirAll(workdir, 0755); err != nil {
 		return nil, err
 	}
 
-	var config struct{ Endpoint, Key, Secret string }
-	config.Endpoint = os.Getenv("S3_ENDPOINT")
-	config.Key = os.Getenv("S3_KEY")
-	config.Secret = os.Getenv("S3_SECRET")
+	endpoint := strings.TrimPrefix(strings.TrimPrefix(os.Getenv("PUBLIC_S3_ENDPOINT"), "https://"), "http://")
+	key := os.Getenv("PUBLIC_S3_KEY")
+	secret := os.Getenv("PUBLIC_S3_SECRET")
+	bucket := os.Getenv("PUBLIC_S3_BUCKET")
 	for name, value := range map[string]string{
-		"S3_ENDPOINT": config.Endpoint, "S3_KEY": config.Key, "S3_SECRET": config.Secret,
+		"PUBLIC_S3_ENDPOINT": endpoint, "PUBLIC_S3_KEY": key,
+		"PUBLIC_S3_SECRET": secret, "PUBLIC_S3_BUCKET": bucket,
 	} {
 		if value == "" {
 			return nil, fmt.Errorf("environment variable %s is not set", name)
 		}
 	}
 
-	client, err := minio.New(config.Endpoint, &minio.Options{
-		Creds:  credentials.NewStaticV4(config.Key, config.Secret, ""),
-		Secure: true,
+	client, err := minio.New(endpoint, &minio.Options{
+		Creds:        credentials.NewStaticV4(key, secret, ""),
+		Secure:       true,
+		Region:       os.Getenv("PUBLIC_S3_REGION"),
+		BucketLookup: minio.BucketLookupPath,
 	})
 	if err != nil {
 		return nil, err
@@ -94,19 +100,20 @@ func NewStorage(workdir string) (*Storage, error) {
 	client.SetAppInfo("osmviews-webserver", "0.1")
 	return &Storage{
 		client:  client,
+		bucket:  bucket,
 		workdir: workdir,
 		files:   make(map[string]*localFile, 10),
 	}, nil
 }
 
-var objRegexp = regexp.MustCompile(`public/([a-z\-]+)\-(2[0-9]{7})\.([a-z0-9\.]+)`)
+var objRegexp = regexp.MustCompile(`data/([a-z\-]+)\-(2[0-9]{7})\.([a-z0-9\.]+)`)
 
 // Reload caches public content from remote object storage to local disk.
 // Any old content (which is not live anymore) is deleted from local disk.
 func (s *Storage) Reload(ctx context.Context) error {
 	// Find the most recent version of each file in storage.
-	objects := s.client.ListObjects(ctx, "osmviews", minio.ListObjectsOptions{
-		Prefix:    "public/",
+	objects := s.client.ListObjects(ctx, s.bucket, minio.ListObjectsOptions{
+		Prefix:    "data/",
 		Recursive: false,
 	})
 	// The GeoTIFF is served under a de-dated name, "osmviews.tiff", that
@@ -141,7 +148,7 @@ func (s *Storage) Reload(ctx context.Context) error {
 		}
 		if _, err := os.Stat(path); err != nil {
 			tmpPath := path + ".tmp"
-			if err := s.client.FGetObject(ctx, "osmviews", obj.Key, tmpPath, minio.GetObjectOptions{}); err != nil {
+			if err := s.client.FGetObject(ctx, s.bucket, obj.Key, tmpPath, minio.GetObjectOptions{}); err != nil {
 				return err
 			}
 			if err := os.Chtimes(tmpPath, time.Now(), obj.LastModified); err != nil {

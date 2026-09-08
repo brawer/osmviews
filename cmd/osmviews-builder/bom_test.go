@@ -121,7 +121,7 @@ func TestSoftwarePURL(t *testing.T) {
 func TestDataPURL(t *testing.T) {
 	in := bomTestInputs()
 	want := "pkg:generic/osmviews@2025-08-30?checksum=sha256:" + in.SHA256 +
-		"&download_url=https%3A%2F%2Fosmviews.toolforge.org%2Fdownload%2Fosmviews.tiff"
+		"&download_url=https%3A%2F%2Fosmviews.dandelis.ch%2Fdata%2Fosmviews-20250830.tiff"
 	if got := in.dataPURL(); got != want {
 		t.Errorf("dataPURL() = %q, want %q", got, want)
 	}

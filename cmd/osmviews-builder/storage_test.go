@@ -51,133 +51,73 @@ func TestCleanup(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s := NewFakeStorage()
-	for _, path := range []string{
-		"internal/otherproject’s_data_should/not/be/touched.txt",
-		"public/osmviews-not-matching-pattern.txt",
-		"public/quxfoo-20210830.csv.gz",
-	} {
-		if err := s.PutFile(ctx, "osmviews", path, localpath, "text/plain"); err != nil {
+	internal := NewFakeStorage()
+	public := NewFakeStorage()
+	put := func(s *FakeStorage, key string) {
+		if err := s.PutFile(ctx, "b", key, localpath, "application/octet-stream"); err != nil {
 			t.Fatal(err)
 		}
 	}
-	for _, date := range []string{"20211205", "20211212", "20211226", "20220102", "20220109"} {
-		for _, p := range []struct{ pattern, contentType string }{
-			// Only the 3 most recent .tiff survive; every .cdx.json is kept
-			// (retained forever, issue #110), so all 5 appear in want below.
-			{"public/osmviews-%s.tiff", "image/tiff"},
-			{"public/osmviews-%s.cdx.json", "application/vnd.cyclonedx+json"},
-			// The retired statistics sidecar: Cleanup now purges every one
-			// (keep: 0), so none of these appear in want below.
-			{"public/osmviews-stats-%s.json", "application/json"},
-		} {
-			path := fmt.Sprintf(p.pattern, date)
-			if err := s.PutFile(ctx, "osmviews", path, localpath, p.contentType); err != nil {
-				t.Fatal(err)
-			}
-		}
-	}
+
+	// Internal bucket: a rolling year of weekly tile-log aggregates (keep 60),
+	// plus an unrelated object that must be left alone.
+	put(internal, "internal/otherproject’s_data_should/not/be/touched.txt")
 	for year := 2021; year <= 2022; year++ {
 		for week := 1; week <= 52; week++ {
 			if year == 2022 && week > 40 {
 				break
 			}
-			path := fmt.Sprintf("internal/osmviews-builder/tilelogs-%d-W%02d.br", year, week)
-			if err := s.PutFile(ctx, "osmviews", path, localpath, "application/x-brotli"); err != nil {
-				t.Fatal(err)
-			}
+			put(internal, fmt.Sprintf("internal/osmviews-builder/tilelogs-%d-W%02d.br", year, week))
 		}
 	}
-	if err := Cleanup(s, "osmviews"); err != nil {
+
+	// Public bucket: 5 dated builds. Only the 3 most recent .tiff survive;
+	// every .cdx.json is kept forever (issue #110). Decoys must be left alone.
+	put(public, "data/osmviews-not-matching-pattern.txt")
+	put(public, "data/quxfoo-20210830.csv.gz")
+	for _, date := range []string{"20211205", "20211212", "20211226", "20220102", "20220109"} {
+		put(public, fmt.Sprintf("data/osmviews-%s.tiff", date))
+		put(public, fmt.Sprintf("data/osmviews-%s.cdx.json", date))
+	}
+
+	if err := Cleanup(internal, "internal-bucket", public, "public-bucket"); err != nil {
 		t.Fatal(err)
 	}
 
-	got := make([]string, 0)
-	files, err := s.List(ctx, "osmviews", "public/")
-	if err != nil {
-		t.Fatal(err)
+	assertKeys := func(name string, s *FakeStorage, want []string) {
+		t.Helper()
+		got := make([]string, 0, len(s.Files))
+		for k := range s.Files {
+			got = append(got, k)
+		}
+		sort.Strings(got)
+		sort.Strings(want)
+		if strings.Join(got, "|") != strings.Join(want, "|") {
+			t.Errorf("%s bucket after Cleanup:\n got %v\nwant %v", name, got, want)
+		}
 	}
-	for _, f := range files {
-		got = append(got, f.Key)
-	}
-	sort.Strings(got)
 
-	want := []string{
-		"internal/osmviews-builder/tilelogs-2021-W33.br",
-		"internal/osmviews-builder/tilelogs-2021-W34.br",
-		"internal/osmviews-builder/tilelogs-2021-W35.br",
-		"internal/osmviews-builder/tilelogs-2021-W36.br",
-		"internal/osmviews-builder/tilelogs-2021-W37.br",
-		"internal/osmviews-builder/tilelogs-2021-W38.br",
-		"internal/osmviews-builder/tilelogs-2021-W39.br",
-		"internal/osmviews-builder/tilelogs-2021-W40.br",
-		"internal/osmviews-builder/tilelogs-2021-W41.br",
-		"internal/osmviews-builder/tilelogs-2021-W42.br",
-		"internal/osmviews-builder/tilelogs-2021-W43.br",
-		"internal/osmviews-builder/tilelogs-2021-W44.br",
-		"internal/osmviews-builder/tilelogs-2021-W45.br",
-		"internal/osmviews-builder/tilelogs-2021-W46.br",
-		"internal/osmviews-builder/tilelogs-2021-W47.br",
-		"internal/osmviews-builder/tilelogs-2021-W48.br",
-		"internal/osmviews-builder/tilelogs-2021-W49.br",
-		"internal/osmviews-builder/tilelogs-2021-W50.br",
-		"internal/osmviews-builder/tilelogs-2021-W51.br",
-		"internal/osmviews-builder/tilelogs-2021-W52.br",
-		"internal/osmviews-builder/tilelogs-2022-W01.br",
-		"internal/osmviews-builder/tilelogs-2022-W02.br",
-		"internal/osmviews-builder/tilelogs-2022-W03.br",
-		"internal/osmviews-builder/tilelogs-2022-W04.br",
-		"internal/osmviews-builder/tilelogs-2022-W05.br",
-		"internal/osmviews-builder/tilelogs-2022-W06.br",
-		"internal/osmviews-builder/tilelogs-2022-W07.br",
-		"internal/osmviews-builder/tilelogs-2022-W08.br",
-		"internal/osmviews-builder/tilelogs-2022-W09.br",
-		"internal/osmviews-builder/tilelogs-2022-W10.br",
-		"internal/osmviews-builder/tilelogs-2022-W11.br",
-		"internal/osmviews-builder/tilelogs-2022-W12.br",
-		"internal/osmviews-builder/tilelogs-2022-W13.br",
-		"internal/osmviews-builder/tilelogs-2022-W14.br",
-		"internal/osmviews-builder/tilelogs-2022-W15.br",
-		"internal/osmviews-builder/tilelogs-2022-W16.br",
-		"internal/osmviews-builder/tilelogs-2022-W17.br",
-		"internal/osmviews-builder/tilelogs-2022-W18.br",
-		"internal/osmviews-builder/tilelogs-2022-W19.br",
-		"internal/osmviews-builder/tilelogs-2022-W20.br",
-		"internal/osmviews-builder/tilelogs-2022-W21.br",
-		"internal/osmviews-builder/tilelogs-2022-W22.br",
-		"internal/osmviews-builder/tilelogs-2022-W23.br",
-		"internal/osmviews-builder/tilelogs-2022-W24.br",
-		"internal/osmviews-builder/tilelogs-2022-W25.br",
-		"internal/osmviews-builder/tilelogs-2022-W26.br",
-		"internal/osmviews-builder/tilelogs-2022-W27.br",
-		"internal/osmviews-builder/tilelogs-2022-W28.br",
-		"internal/osmviews-builder/tilelogs-2022-W29.br",
-		"internal/osmviews-builder/tilelogs-2022-W30.br",
-		"internal/osmviews-builder/tilelogs-2022-W31.br",
-		"internal/osmviews-builder/tilelogs-2022-W32.br",
-		"internal/osmviews-builder/tilelogs-2022-W33.br",
-		"internal/osmviews-builder/tilelogs-2022-W34.br",
-		"internal/osmviews-builder/tilelogs-2022-W35.br",
-		"internal/osmviews-builder/tilelogs-2022-W36.br",
-		"internal/osmviews-builder/tilelogs-2022-W37.br",
-		"internal/osmviews-builder/tilelogs-2022-W38.br",
-		"internal/osmviews-builder/tilelogs-2022-W39.br",
-		"internal/osmviews-builder/tilelogs-2022-W40.br",
-		"internal/otherproject’s_data_should/not/be/touched.txt",
-		"public/osmviews-20211205.cdx.json",
-		"public/osmviews-20211212.cdx.json",
-		"public/osmviews-20211226.cdx.json",
-		"public/osmviews-20211226.tiff",
-		"public/osmviews-20220102.cdx.json",
-		"public/osmviews-20220102.tiff",
-		"public/osmviews-20220109.cdx.json",
-		"public/osmviews-20220109.tiff",
-		"public/osmviews-not-matching-pattern.txt",
-		"public/quxfoo-20210830.csv.gz",
+	wantInternal := []string{"internal/otherproject’s_data_should/not/be/touched.txt"}
+	for week := 33; week <= 52; week++ { // 2021-W33..W52
+		wantInternal = append(wantInternal, fmt.Sprintf("internal/osmviews-builder/tilelogs-2021-W%02d.br", week))
 	}
-	if strings.Join(got, "|") != strings.Join(want, "|") {
-		t.Errorf("got %v, want %v", got, want)
+	for week := 1; week <= 40; week++ { // 2022-W01..W40
+		wantInternal = append(wantInternal, fmt.Sprintf("internal/osmviews-builder/tilelogs-2022-W%02d.br", week))
 	}
+	assertKeys("internal", internal, wantInternal)
+
+	assertKeys("public", public, []string{
+		"data/osmviews-not-matching-pattern.txt",
+		"data/quxfoo-20210830.csv.gz",
+		"data/osmviews-20211205.cdx.json",
+		"data/osmviews-20211212.cdx.json",
+		"data/osmviews-20211226.cdx.json",
+		"data/osmviews-20211226.tiff",
+		"data/osmviews-20220102.cdx.json",
+		"data/osmviews-20220102.tiff",
+		"data/osmviews-20220109.cdx.json",
+		"data/osmviews-20220109.tiff",
+	})
 }
 
 func TestDownload(t *testing.T) {
