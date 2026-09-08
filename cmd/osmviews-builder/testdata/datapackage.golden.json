@@ -1,0 +1,56 @@
+{
+  "$schema": "https://datapackage.org/profiles/2.0/datapackage.json",
+  "name": "osmviews",
+  "id": "0c231884-c307-56cd-a796-787ff9fceb08",
+  "title": "OSMViews — worldwide ranking of geographic locations",
+  "description": "OpenStreetMap view density in weekly user views per km2, as a Cloud-Optimized GeoTIFF (EPSG:3857, zoom 0-18). Rebuilt weekly over a trailing 52-week window.",
+  "version": "2025-08-30",
+  "created": "2025-08-30T00:00:00Z",
+  "homepage": "https://osmviews.dandelis.ch",
+  "licenses": [
+    {
+      "name": "CC0-1.0",
+      "path": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "title": "Creative Commons Zero v1.0 Universal"
+    }
+  ],
+  "sources": [
+    {
+      "title": "OpenStreetMap tile logs",
+      "path": "https://planet.openstreetmap.org/tile_logs/"
+    }
+  ],
+  "contributors": [
+    {
+      "title": "Sascha Brawer",
+      "path": "https://brawer.ch",
+      "roles": [
+        "author",
+        "publisher"
+      ]
+    }
+  ],
+  "resources": [
+    {
+      "name": "osmviews",
+      "path": "osmviews-20250830.tiff",
+      "title": "OSMViews raster",
+      "description": "Cloud-Optimized GeoTIFF, EPSG:3857, zoom 0-18. This dated object is immutable; the manifest's version is what advances.",
+      "format": "tiff",
+      "mediatype": "image/tiff; application=geotiff",
+      "bytes": 608174080,
+      "hash": "sha256:98c9734da0a3370f9efc164535ee72d03d91289956117853a158839fcc88da13"
+    },
+    {
+      "name": "sbom",
+      "path": "osmviews-20250830.cdx.json",
+      "title": "CycloneDX 1.7 bill of materials",
+      "description": "Provenance for the raster: producing software (by purl) and dataset identity, anchored on the raster's SHA-256/512.",
+      "format": "json",
+      "mediatype": "application/vnd.cyclonedx+json; version=1.7",
+      "bytes": 3072,
+      "hash": "sha256:45bbade72a992d3dabc4dac1bcf13e4eec85dda9b2ad5393a6910f3e014c02d9",
+      "describes": "osmviews"
+    }
+  ]
+}

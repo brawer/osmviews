@@ -85,14 +85,20 @@ func main() {
 	localBomPath := filepath.Join(*workdir, fmt.Sprintf("osmviews-%s.cdx.json", date))
 	remoteBomPath := fmt.Sprintf("data/osmviews-%s.cdx.json", date)
 
-	// Check if the output files already exist in the public bucket.
-	// If we can stat both without an error, this week is already published.
-	if _, err := pub.Stat(ctx, pubBucket, remotepath); err == nil {
-		if _, err := pub.Stat(ctx, pubBucket, remoteBomPath); err == nil {
-			logger.Printf("already in storage: %s/%s and %s/%s; nothing to do",
-				pubBucket, remotepath, pubBucket, remoteBomPath)
-			return
+	// If every published object for this week is already in the public bucket,
+	// there is nothing to do. datapackage.json is written last, so requiring it
+	// too means a build interrupted mid-publish is retried on the next run (the
+	// paint is deterministic, so the rebuild is byte-identical).
+	published := true
+	for _, key := range []string{remotepath, remoteBomPath, "data/datapackage.json"} {
+		if _, err := pub.Stat(ctx, pubBucket, key); err != nil {
+			published = false
+			break
 		}
+	}
+	if published {
+		logger.Printf("already published: %s/%s and siblings; nothing to do", pubBucket, remotepath)
+		return
 	}
 
 	// Paint the output GeoTIFF file. The description deliberately carries no
@@ -132,18 +138,52 @@ func main() {
 		logger.Fatalf("building BOM %s: %v", localBomPath, err)
 	}
 
-	// Upload to the public bucket, and garbage-collect old files. The BOM goes
-	// first: a consumer identifies a GeoTIFF by its DateTime tag (306) and
-	// derives the dated BOM URL from it, so uploading referenced-before-
-	// referencer means whatever a consumer can reach is already there.
-	if err := pub.PutFile(ctx, pubBucket, remoteBomPath, localBomPath, "application/vnd.cyclonedx+json"); err != nil {
-		logger.Fatalf("uploading %s/%s: %v", pubBucket, remoteBomPath, err)
+	// Build the Frictionless datapackage.json: the version date and every
+	// distribution by relative path, byte size and SHA-256. See datapackage.go
+	// and https://github.com/brawer/osmviews/issues/110.
+	bomSHA256, _, err := hashFile(localBomPath)
+	if err != nil {
+		logger.Fatalf("hashing %s: %v", localBomPath, err)
 	}
-	if err := pub.PutFile(ctx, pubBucket, remotepath, localpath, "image/tiff"); err != nil {
-		logger.Fatalf("uploading %s/%s: %v", pubBucket, remotepath, err)
+	rasterInfo, err := os.Stat(localpath)
+	if err != nil {
+		logger.Fatalf("stat %s: %v", localpath, err)
 	}
-	logger.Printf("uploaded %s/%s and %s/%s; done, %s",
-		pubBucket, remoteBomPath, pubBucket, remotepath, memStats())
+	bomInfo, err := os.Stat(localBomPath)
+	if err != nil {
+		logger.Fatalf("stat %s: %v", localBomPath, err)
+	}
+	localDPPath := filepath.Join(*workdir, "datapackage.json")
+	if err := writeDatapackage(localDPPath, datapackageInputs{
+		Date:         logs.lastDay,
+		RasterPath:   filepath.Base(remotepath),
+		RasterBytes:  rasterInfo.Size(),
+		RasterSHA256: sha256hex,
+		BOMPath:      filepath.Base(remoteBomPath),
+		BOMBytes:     bomInfo.Size(),
+		BOMSHA256:    bomSHA256,
+	}); err != nil {
+		logger.Fatalf("building datapackage.json: %v", err)
+	}
+
+	// Upload to the public bucket, and garbage-collect old files. Order is
+	// BOM -> GeoTIFF -> datapackage.json: each object is written before the
+	// object that references it, so whatever a consumer can reach is already
+	// there. datapackage.json last means "I can see version N" implies all of
+	// N's files exist.
+	const remoteDPPath = "data/datapackage.json"
+	uploads := []struct{ remote, local, contentType string }{
+		{remoteBomPath, localBomPath, "application/vnd.cyclonedx+json"},
+		{remotepath, localpath, "image/tiff"},
+		{remoteDPPath, localDPPath, "application/json"},
+	}
+	for _, u := range uploads {
+		if err := pub.PutFile(ctx, pubBucket, u.remote, u.local, u.contentType); err != nil {
+			logger.Fatalf("uploading %s/%s: %v", pubBucket, u.remote, err)
+		}
+	}
+	logger.Printf("uploaded %s/%s, %s/%s and %s/%s; done, %s",
+		pubBucket, remoteBomPath, pubBucket, remotepath, pubBucket, remoteDPPath, memStats())
 
 	if err := Cleanup(storage, bucket, pub, pubBucket); err != nil {
 		logger.Fatalf("garbage-collecting old files in storage: %v", err)
