@@ -44,20 +44,20 @@ func main() {
 		}
 	}
 
-	storage, err := NewStorage()
+	storage, bucket, err := NewInternalStorage()
 	if err != nil {
 		logger.Fatalf("connecting to object storage: %v", err)
 	}
-	bucketExists, err := storage.BucketExists(ctx, "osmviews")
+	bucketExists, err := storage.BucketExists(ctx, bucket)
 	if err != nil {
-		logger.Fatalf("checking for bucket \"osmviews\": %v", err)
+		logger.Fatalf("checking for bucket %q: %v", bucket, err)
 	}
 	if !bucketExists {
-		logger.Fatal("storage bucket \"osmviews\" does not exist")
+		logger.Fatalf("storage bucket %q does not exist", bucket)
 	}
 
 	maxWeeks := 52 // 1 year
-	logs, err := fetchWeeklyLogs(*workdir, storage, maxWeeks)
+	logs, err := fetchWeeklyLogs(*workdir, storage, bucket, maxWeeks)
 	if err != nil {
 		logger.Fatalf("fetching weekly tile logs: %v", err)
 	}
@@ -72,7 +72,6 @@ func main() {
 	}
 	lastDay := weekStart(year, week).AddDate(0, 0, 6)
 	date := lastDay.Format("20060102")
-	bucket := "osmviews"
 	localpath := filepath.Join(*workdir, fmt.Sprintf("osmviews-%s.tiff", date))
 	remotepath := fmt.Sprintf("public/osmviews-%s.tiff", date)
 	localBomPath := filepath.Join(*workdir, fmt.Sprintf("osmviews-%s.cdx.json", date))
@@ -144,7 +143,7 @@ func main() {
 		logger.Printf("uploaded %s/%s and %s/%s; done, %s",
 			bucket, remoteBomPath, bucket, remotepath, memStats())
 
-		if err := Cleanup(storage); err != nil {
+		if err := Cleanup(storage, bucket); err != nil {
 			logger.Fatalf("garbage-collecting old files in storage: %v", err)
 		}
 	}
@@ -192,7 +191,7 @@ type weeklyLogs struct {
 	lastDay  time.Time   // most recent ingested daily log
 }
 
-func fetchWeeklyLogs(workdir string, storage Storage, maxWeeks int) (*weeklyLogs, error) {
+func fetchWeeklyLogs(workdir string, storage Storage, bucket string, maxWeeks int) (*weeklyLogs, error) {
 	logger := log.Default()
 	client := newHTTPClient()
 	weeks, err := GetAvailableWeeks(client, time.Now())
@@ -224,7 +223,7 @@ func fetchWeeklyLogs(workdir string, storage Storage, maxWeeks int) (*weeklyLogs
 	readers := make([]io.Reader, 0, len(weeks))
 	weights := make([]float64, 0, len(weeks))
 	for _, week := range weeks {
-		r, err := GetTileLogs(week.Week, week.NumDays, client, workdir, storage)
+		r, err := GetTileLogs(week.Week, week.NumDays, client, workdir, storage, bucket)
 		if err != nil {
 			return nil, fmt.Errorf("week %s: %w", week.Week, err)
 		}
