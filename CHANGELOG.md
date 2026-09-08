@@ -13,6 +13,26 @@ Conventional Commit history. Versioning follows
 the **minor** version may be breaking — see
 [RELEASING.md](RELEASING.md#choosing-the-version-number).
 
+## [0.2.0](https://github.com/brawer/osmviews/compare/v0.1.6...v0.2.0) (2026-09-08)
+
+
+### ⚠ BREAKING CHANGES
+
+* **osmviews-builder:** osmviews-builder and the webserver now require PUBLIC_S3_* (ENDPOINT, KEY, SECRET, BUCKET, optional REGION). The current published objects must be copied to the public bucket's data/ prefix before this deploys, or osmviews.toolforge.org/download/osmviews.tiff 404s until the next weekly build.
+* **osmviews-builder:** osmviews-builder now requires INTERNAL_S3_ENDPOINT, INTERNAL_S3_KEY, INTERNAL_S3_SECRET and INTERNAL_S3_BUCKET instead of S3_ENDPOINT / S3_KEY / S3_SECRET. Set them before deploying.
+* **osmviews-builder:** keep dated CycloneDX BOMs forever
+* **webserver:** drop the Link: rel="describedby" header
+* **osmviews-builder:** the `osmviews-stats-<date>.json` sidecar is no longer published. Its `externalReference` is gone from the CycloneDX BOM. Consumers that need the value distribution read the Raster Attribute Table embedded in the GeoTIFF instead.
+
+### 🆕 Features
+
+* **osmviews-builder:** configure the internal bucket via INTERNAL_S3_* env ([d4219eb](https://github.com/brawer/osmviews/commit/d4219eb6e9cd1814110c640ffb07c01a777ba8d0))
+* **osmviews-builder:** embed the value histogram in the GeoTIFF ([3275863](https://github.com/brawer/osmviews/commit/327586378fbb18710ab58f8d3c75ea0fe5da6038)), closes [#109](https://github.com/brawer/osmviews/issues/109)
+* **osmviews-builder:** emit data/datapackage.json ([15ec7d2](https://github.com/brawer/osmviews/commit/15ec7d24dea6c635b02a5ec55bd667d935a262df))
+* **osmviews-builder:** keep dated CycloneDX BOMs forever ([c3eff12](https://github.com/brawer/osmviews/commit/c3eff12d43cc1ee799d03bafeb19329a0d295c8a))
+* **osmviews-builder:** publish the GeoTIFF and BOM to the public CDN bucket ([3330131](https://github.com/brawer/osmviews/commit/3330131b3fd09ecb1dd41e586a15489c913176b9))
+* **webserver:** drop the Link: rel="describedby" header ([c7d2fe3](https://github.com/brawer/osmviews/commit/c7d2fe325960548a371fad4bf86cac1cec6566ab))
+
 ## [0.1.6](https://github.com/brawer/osmviews/compare/v0.1.5...v0.1.6) (2026-09-04)
 
 
