@@ -130,10 +130,10 @@ func main() {
 		logger.Fatalf("building BOM %s: %v", localBomPath, err)
 	}
 
-	// Upload to storage, and garbage-collect old files. The GeoTIFF goes
-	// last, because it is the entry point a consumer starts from: its Link
-	// header points at the BOM. Uploading referenced-before-referencer means
-	// whatever a consumer can reach is already there.
+	// Upload to storage, and garbage-collect old files. The BOM goes first:
+	// a consumer identifies a GeoTIFF by its DateTime tag (306) and derives
+	// the dated BOM URL from it, so uploading referenced-before-referencer
+	// means whatever a consumer can reach is already there.
 	if storage != nil {
 		if err := storage.PutFile(ctx, bucket, remoteBomPath, localBomPath, "application/vnd.cyclonedx+json"); err != nil {
 			logger.Fatalf("uploading %s/%s: %v", bucket, remoteBomPath, err)

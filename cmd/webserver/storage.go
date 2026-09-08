@@ -12,7 +12,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -114,10 +113,9 @@ func (s *Storage) Reload(ctx context.Context) error {
 	// always points at the most recent version. Every auxiliary file (the
 	// CycloneDX BOM, and any later sibling) is served only under its dated
 	// basename, "osmviews-<...>-<YYYYMMDD>.<ext>", so its URL is immutable and
-	// names the exact GeoTIFF it belongs to. The three most recent of each
-	// auxiliary family are kept, matching the builder's own retention.
+	// names the exact GeoTIFF it belongs to. Every dated BOM the bucket holds
+	// is served; they are retained indefinitely (issue #110).
 	inStorage := make(map[string]minio.ObjectInfo, 8)
-	auxNames := make(map[string][]string) // "<stem>|<ext>" -> dated names
 	for obj := range objects {
 		m := objRegexp.FindStringSubmatch(obj.Key)
 		if m == nil {
@@ -129,18 +127,7 @@ func (s *Storage) Reload(ctx context.Context) error {
 			}
 			continue
 		}
-		dated := filepath.Base(obj.Key)
-		inStorage[dated] = obj
-		family := m[1] + "|" + m[3]
-		auxNames[family] = append(auxNames[family], dated)
-	}
-	for _, names := range auxNames {
-		if len(names) > 3 {
-			sort.Sort(sort.Reverse(sort.StringSlice(names))) // dated names sort chronologically
-			for _, n := range names[3:] {
-				delete(inStorage, n)
-			}
-		}
+		inStorage[filepath.Base(obj.Key)] = obj
 	}
 
 	files := make(map[string]*localFile, len(inStorage))

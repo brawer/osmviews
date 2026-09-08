@@ -107,7 +107,10 @@ func Cleanup(s Storage) error {
 	}{
 		{"internal/osmviews-builder/tilelogs-", `internal/osmviews-builder/tilelogs-\d{4}-W\d{2}(-\d+d)?\.br`, 60},
 		{"public/osmviews-", `public/osmviews-\d{8}\.tiff`, 3},
-		{"public/osmviews-", `public/osmviews-\d{8}\.cdx\.json`, 3},
+		// Dated CycloneDX BOMs (public/osmviews-<date>.cdx.json) are kept
+		// forever: ~3 KB each, a permanent provenance record that downstream
+		// consumers can cite by URL. https://github.com/brawer/osmviews/issues/110
+		//
 		// One-time purge of the retired statistics sidecar (issue #109; the
 		// histogram now lives in the GeoTIFF's GDAL_METADATA tag). keep: 0
 		// deletes every match; remove this line once the bucket is clean.

@@ -12,13 +12,13 @@ URL names the exact GeoTIFF it belongs to.
 | File | URL | Format | Retention |
 |---|---|---|---|
 | Raster | `https://osmviews.toolforge.org/download/osmviews.tiff` | Cloud-Optimized GeoTIFF, EPSG:3857, zoom 0–18, ~580 MB | latest only |
-| Bill of materials | `…/download/osmviews-<YYYYMMDD>.cdx.json` | [CycloneDX](https://cyclonedx.org) 1.7 JSON | 3 most recent |
+| Bill of materials | `…/download/osmviews-<YYYYMMDD>.cdx.json` | [CycloneDX](https://cyclonedx.org) 1.7 JSON | kept indefinitely |
 
 `<YYYYMMDD>` is the last day of the most recent tile-log week that went into the
 build — the same date the GeoTIFF carries in its `DateTime` tag.
 
-Only the three most recent bills of materials are kept. If you need provenance
-that outlives that window, copy the file you used into your own storage.
+Every bill of materials is kept indefinitely (a few kilobytes each), so a dated
+URL stays resolvable for good.
 
 
 ## Pixel values and histogram
@@ -63,9 +63,8 @@ how it was made. The GeoTIFF carries its version date in the `DateTime` tag
 DateTime (306): 2026:08:30 00:00:00  →  /download/osmviews-20260830.cdx.json
 ```
 
-If provenance matters to you, fetch the BOM right after the GeoTIFF and keep it
-next to the file; the dated BOM URL is immutable, but only the three most recent
-builds are retained, so don't rely on recovering it later.
+The dated BOM URL is immutable and kept indefinitely, so you can resolve it at
+any time from a GeoTIFF you downloaded earlier.
 
 
 ## The bill of materials
@@ -95,11 +94,9 @@ A [CycloneDX](https://cyclonedx.org) 1.7 document describing one dated GeoTIFF:
 3. `GET` the BOM
 4. assert `sha256(step 1 bytes) == metadata.component.hashes["SHA-256"]`
 
-Fetch the BOM right after the GeoTIFF, while the build is still within the
-roughly three-week retention window. The BOM is written before the GeoTIFF, so
-if both come from the same build step 4 passes. It fails only if the pair
-drifted apart (a download resumed across a weekly update, or a caching proxy
-mixing builds); if so, re-download and retry.
+The BOM URL in step 2 is derived from the bytes you downloaded, so step 4 fails
+only if those bytes are internally inconsistent — a download resumed across a
+weekly update, or a caching proxy mixing builds. If so, re-download and retry.
 
 
 ## Recording OSMViews in your data BOM
@@ -118,5 +115,6 @@ OSMViews GeoTIFF as an input:
   entry, for the full provenance — the producing `osmviews-builder` revision,
   the OpenStreetMap tile-log inputs, the build workflow.
 
-Our BOM is kept for only about three weeks, so point that `bom` reference at a
-copy you archived alongside your output, not the Toolforge URL.
+Our BOMs are kept indefinitely, so that `bom` reference can point straight at
+the dated URL. If your provenance needs to outlive this project's hosting,
+archive a copy alongside your output as well.

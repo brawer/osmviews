@@ -37,6 +37,8 @@ func TestCleanup(t *testing.T) {
 	}
 	for _, date := range []string{"20211205", "20211212", "20211226", "20220102", "20220109"} {
 		for _, p := range []struct{ pattern, contentType string }{
+			// Only the 3 most recent .tiff survive; every .cdx.json is kept
+			// (retained forever, issue #110), so all 5 appear in want below.
 			{"public/osmviews-%s.tiff", "image/tiff"},
 			{"public/osmviews-%s.cdx.json", "application/vnd.cyclonedx+json"},
 			// The retired statistics sidecar: Cleanup now purges every one
@@ -136,6 +138,8 @@ func TestCleanup(t *testing.T) {
 		"internal/osmviews-builder/tilelogs-2022-W39.br",
 		"internal/osmviews-builder/tilelogs-2022-W40.br",
 		"internal/otherproject’s_data_should/not/be/touched.txt",
+		"public/osmviews-20211205.cdx.json",
+		"public/osmviews-20211212.cdx.json",
 		"public/osmviews-20211226.cdx.json",
 		"public/osmviews-20211226.tiff",
 		"public/osmviews-20220102.cdx.json",
