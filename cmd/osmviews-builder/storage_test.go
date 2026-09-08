@@ -17,6 +17,32 @@ import (
 	"testing"
 )
 
+func TestNewRemoteStorage(t *testing.T) {
+	set := func(m map[string]string) {
+		for _, k := range []string{"T_ENDPOINT", "T_KEY", "T_SECRET", "T_BUCKET", "T_REGION"} {
+			t.Setenv(k, m[k])
+		}
+	}
+
+	set(map[string]string{"T_ENDPOINT": "https://s3.example.com", "T_KEY": "k", "T_SECRET": "s", "T_BUCKET": "b"})
+	s, bucket, err := newRemoteStorage("T_", true)
+	if err != nil {
+		t.Fatalf("newRemoteStorage: %v", err)
+	}
+	if bucket != "b" {
+		t.Errorf("bucket = %q, want %q", bucket, "b")
+	}
+	// The https:// scheme in the endpoint must be stripped for minio.New.
+	if got := s.(*remoteStorage).client.EndpointURL().Host; got != "s3.example.com" {
+		t.Errorf("endpoint host = %q, want s3.example.com", got)
+	}
+
+	set(map[string]string{"T_ENDPOINT": "s3.example.com", "T_KEY": "k", "T_SECRET": "s"})
+	if _, _, err := newRemoteStorage("T_", false); err == nil || !strings.Contains(err.Error(), "T_BUCKET") {
+		t.Errorf("missing T_BUCKET: got err %v, want one naming T_BUCKET", err)
+	}
+}
+
 func TestCleanup(t *testing.T) {
 	ctx := context.Background()
 
@@ -62,7 +88,7 @@ func TestCleanup(t *testing.T) {
 			}
 		}
 	}
-	if err := Cleanup(s); err != nil {
+	if err := Cleanup(s, "osmviews"); err != nil {
 		t.Fatal(err)
 	}
 

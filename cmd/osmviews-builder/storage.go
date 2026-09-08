@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strings"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -76,31 +77,50 @@ func (s *remoteStorage) Remove(ctx context.Context, bucket, path string) error {
 	return s.client.RemoveObject(ctx, bucket, path, minio.RemoveObjectOptions{})
 }
 
-// NewStorage sets up a client for accessing S3-compatible object storage.
-func NewStorage() (Storage, error) {
-	endpoint := os.Getenv("S3_ENDPOINT")
-	key := os.Getenv("S3_KEY")
-	secret := os.Getenv("S3_SECRET")
+// NewInternalStorage connects to the S3-compatible bucket that holds the
+// build's private tile-log aggregates, configured through INTERNAL_S3_ENDPOINT
+// / _KEY / _SECRET / _BUCKET (and an optional _REGION). It returns the client
+// and the bucket name. The public bucket the CDN serves has its own client
+// (issue #110).
+func NewInternalStorage() (Storage, string, error) {
+	return newRemoteStorage("INTERNAL_S3_", false)
+}
+
+// newRemoteStorage builds a minio client from "<prefix>ENDPOINT", "<prefix>KEY",
+// "<prefix>SECRET" and "<prefix>BUCKET" (all required) plus an optional
+// "<prefix>REGION". pathStyle forces path-style bucket addressing, which some
+// providers (Bunny) require and others reject.
+func newRemoteStorage(prefix string, pathStyle bool) (Storage, string, error) {
+	endpoint := strings.TrimPrefix(strings.TrimPrefix(os.Getenv(prefix+"ENDPOINT"), "https://"), "http://")
+	key := os.Getenv(prefix + "KEY")
+	secret := os.Getenv(prefix + "SECRET")
+	bucket := os.Getenv(prefix + "BUCKET")
 	for name, value := range map[string]string{
-		"S3_ENDPOINT": endpoint, "S3_KEY": key, "S3_SECRET": secret,
+		prefix + "ENDPOINT": endpoint, prefix + "KEY": key,
+		prefix + "SECRET": secret, prefix + "BUCKET": bucket,
 	} {
 		if value == "" {
-			return nil, fmt.Errorf("environment variable %s is not set", name)
+			return nil, "", fmt.Errorf("environment variable %s is not set", name)
 		}
 	}
-	client, err := minio.New(endpoint, &minio.Options{
+	opts := &minio.Options{
 		Creds:  credentials.NewStaticV4(key, secret, ""),
 		Secure: true,
-	})
+		Region: os.Getenv(prefix + "REGION"), // "" lets minio decide
+	}
+	if pathStyle {
+		opts.BucketLookup = minio.BucketLookupPath
+	}
+	client, err := minio.New(endpoint, opts)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	client.SetAppInfo("OSMViewsBuilder", "0.1")
-	return &remoteStorage{client: client}, nil
+	return &remoteStorage{client: client}, bucket, nil
 }
 
-func Cleanup(s Storage) error {
+func Cleanup(s Storage, bucket string) error {
 	for _, p := range []struct {
 		prefix, pattern string
 		keep            int
@@ -116,7 +136,7 @@ func Cleanup(s Storage) error {
 		// deletes every match; remove this line once the bucket is clean.
 		{"public/osmviews-stats-", `public/osmviews-stats-\d{8}\.json`, 0},
 	} {
-		if err := cleanupPath("osmviews", p.prefix, p.pattern, p.keep, s); err != nil {
+		if err := cleanupPath(bucket, p.prefix, p.pattern, p.keep, s); err != nil {
 			return err
 		}
 	}

@@ -167,7 +167,7 @@ func weekLogName(week string, numDays int) string {
 // for the requested week are fetched from the OpenStreetMap planet server
 // (missing days are skipped), uncompressed, sorted by TileKey, and stored
 // as a compressed file into workdir and object storage.
-func GetTileLogs(week string, numDays int, client *http.Client, workdir string, storage Storage) (io.Reader, error) {
+func GetTileLogs(week string, numDays int, client *http.Client, workdir string, storage Storage, bucket string) (io.Reader, error) {
 	ctx := context.Background()
 	logger := log.Default()
 
@@ -180,13 +180,13 @@ func GetTileLogs(week string, numDays int, client *http.Client, workdir string, 
 
 	remotePath := fmt.Sprintf("internal/osmviews-builder/%s", name)
 	remotePathExists := false
-	if _, err := storage.Stat(ctx, "osmviews", remotePath); err == nil {
+	if _, err := storage.Stat(ctx, bucket, remotePath); err == nil {
 		remotePathExists = true
 	}
 
 	if remotePathExists {
-		logger.Printf("for week %s, loading s3://osmviews/%s to %s", week, remotePath, path)
-		if err := Download(storage, "osmviews", remotePath, path); err != nil {
+		logger.Printf("for week %s, loading s3://%s/%s to %s", week, bucket, remotePath, path)
+		if err := Download(storage, bucket, remotePath, path); err != nil {
 			logger.Printf("cannot download %s to %s, err=%v", remotePath, path, err)
 			return nil, err
 		}
@@ -274,8 +274,8 @@ func GetTileLogs(week string, numDays int, client *http.Client, workdir string, 
 
 	// Upload the file to object storage.
 	contentType := "application/x-brotli"
-	if err := storage.PutFile(ctx, "osmviews", remotePath, path, contentType); err != nil {
-		logger.Printf("upload of %s to s3://osmviews/%s failed: %v", path, remotePath, err)
+	if err := storage.PutFile(ctx, bucket, remotePath, path, contentType); err != nil {
+		logger.Printf("upload of %s to s3://%s/%s failed: %v", path, bucket, remotePath, err)
 		return nil, err
 	}
 	logger.Printf("for week %s, wrote %s", week, path)

@@ -266,7 +266,7 @@ func TestGetTileLogs(t *testing.T) {
 		return
 	}
 	s := NewFakeStorage()
-	reader, err := GetTileLogs("2567-W12", 7, client, workdir, s)
+	reader, err := GetTileLogs("2567-W12", 7, client, workdir, s, "osmviews")
 	if err != nil {
 		t.Error(err)
 		return
@@ -399,7 +399,7 @@ func TestGetTileLogsPartialWeek(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := NewFakeStorage()
-	reader, err := GetTileLogs("2567-W12", 5, client, workdir, s)
+	reader, err := GetTileLogs("2567-W12", 5, client, workdir, s, "osmviews")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -430,7 +430,7 @@ func TestGetTileLogsCachedInStorage(t *testing.T) {
 	if err := s.PutFile(ctx, "osmviews", "internal/osmviews-builder/tilelogs-2042-W08.br", "testdata/tilelogs-2042-W08.br", "application/x-brotli"); err != nil {
 		t.Fatal(err)
 	}
-	reader, err := GetTileLogs("2042-W08", 7, nil, workdir, s)
+	reader, err := GetTileLogs("2042-W08", 7, nil, workdir, s, "osmviews")
 	if err != nil {
 		t.Error(err)
 		return
@@ -451,7 +451,7 @@ func TestGetTileLogsCachedInWorkdir(t *testing.T) {
 	os.WriteFile(path, foo_br, 0644)
 
 	s := NewFakeStorage()
-	reader, err := GetTileLogs("2051-W17", 7, nil, workdir, s)
+	reader, err := GetTileLogs("2051-W17", 7, nil, workdir, s, "osmviews")
 	if err != nil {
 		t.Error(err)
 		return
