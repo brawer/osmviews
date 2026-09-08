@@ -198,8 +198,8 @@ func TestStorage_Reload_Auxiliary(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// The GeoTIFF keeps its de-dated URL; auxiliary files are dated-only,
-	// and each family independently keeps its three most recent.
+	// The GeoTIFF keeps its de-dated URL; auxiliary files are dated-only and
+	// every one the bucket holds is served (BOMs are retained forever, #110).
 	for _, f := range []struct {
 		deDated, dated, ct string
 	}{
@@ -209,10 +209,7 @@ func TestStorage_Reload_Auxiliary(t *testing.T) {
 		if s.files[f.deDated] != nil {
 			t.Errorf("%s must not be served under a de-dated name", f.deDated)
 		}
-		if s.files[fmt.Sprintf(f.dated, "20260808")] != nil {
-			t.Errorf("%s should have been dropped (keep-3)", fmt.Sprintf(f.dated, "20260808"))
-		}
-		for _, d := range []string{"20260815", "20260822", "20260830"} {
+		for _, d := range []string{"20260808", "20260815", "20260822", "20260830"} {
 			name := fmt.Sprintf(f.dated, d)
 			loc := s.files[name]
 			if loc == nil {
