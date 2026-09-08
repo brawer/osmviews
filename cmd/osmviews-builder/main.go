@@ -46,7 +46,7 @@ func main() {
 
 	storage, bucket, err := NewInternalStorage()
 	if err != nil {
-		logger.Fatalf("connecting to object storage: %v", err)
+		logger.Fatalf("connecting to internal object storage: %v", err)
 	}
 	bucketExists, err := storage.BucketExists(ctx, bucket)
 	if err != nil {
@@ -54,6 +54,14 @@ func main() {
 	}
 	if !bucketExists {
 		logger.Fatalf("storage bucket %q does not exist", bucket)
+	}
+
+	// The GeoTIFF, BOM and (later) datapackage.json go to a separate public
+	// bucket the CDN serves; the tile-log aggregates stay on the internal one.
+	// Bunny's S3 gateway has no HeadBucket, so there is no existence check here.
+	pub, pubBucket, err := NewPublicStorage()
+	if err != nil {
+		logger.Fatalf("connecting to public object storage: %v", err)
 	}
 
 	maxWeeks := 52 // 1 year
@@ -73,21 +81,16 @@ func main() {
 	lastDay := weekStart(year, week).AddDate(0, 0, 6)
 	date := lastDay.Format("20060102")
 	localpath := filepath.Join(*workdir, fmt.Sprintf("osmviews-%s.tiff", date))
-	remotepath := fmt.Sprintf("public/osmviews-%s.tiff", date)
+	remotepath := fmt.Sprintf("data/osmviews-%s.tiff", date)
 	localBomPath := filepath.Join(*workdir, fmt.Sprintf("osmviews-%s.cdx.json", date))
-	remoteBomPath := fmt.Sprintf("public/osmviews-%s.cdx.json", date)
+	remoteBomPath := fmt.Sprintf("data/osmviews-%s.cdx.json", date)
 
-	// Check if the output files already exist in storage.
-	// If we can retrieve object stats without an error, we don’t need
-	// to do anything and are completely done.
-	if storage != nil {
-		_, err := storage.Stat(ctx, bucket, remotepath)
-		hasGeoTiff := err == nil
-		_, err = storage.Stat(ctx, bucket, remoteBomPath)
-		hasBom := err == nil
-		if hasGeoTiff && hasBom {
+	// Check if the output files already exist in the public bucket.
+	// If we can stat both without an error, this week is already published.
+	if _, err := pub.Stat(ctx, pubBucket, remotepath); err == nil {
+		if _, err := pub.Stat(ctx, pubBucket, remoteBomPath); err == nil {
 			logger.Printf("already in storage: %s/%s and %s/%s; nothing to do",
-				bucket, remotepath, bucket, remoteBomPath)
+				pubBucket, remotepath, pubBucket, remoteBomPath)
 			return
 		}
 	}
@@ -129,23 +132,21 @@ func main() {
 		logger.Fatalf("building BOM %s: %v", localBomPath, err)
 	}
 
-	// Upload to storage, and garbage-collect old files. The BOM goes first:
-	// a consumer identifies a GeoTIFF by its DateTime tag (306) and derives
-	// the dated BOM URL from it, so uploading referenced-before-referencer
-	// means whatever a consumer can reach is already there.
-	if storage != nil {
-		if err := storage.PutFile(ctx, bucket, remoteBomPath, localBomPath, "application/vnd.cyclonedx+json"); err != nil {
-			logger.Fatalf("uploading %s/%s: %v", bucket, remoteBomPath, err)
-		}
-		if err := storage.PutFile(ctx, bucket, remotepath, localpath, "image/tiff"); err != nil {
-			logger.Fatalf("uploading %s/%s: %v", bucket, remotepath, err)
-		}
-		logger.Printf("uploaded %s/%s and %s/%s; done, %s",
-			bucket, remoteBomPath, bucket, remotepath, memStats())
+	// Upload to the public bucket, and garbage-collect old files. The BOM goes
+	// first: a consumer identifies a GeoTIFF by its DateTime tag (306) and
+	// derives the dated BOM URL from it, so uploading referenced-before-
+	// referencer means whatever a consumer can reach is already there.
+	if err := pub.PutFile(ctx, pubBucket, remoteBomPath, localBomPath, "application/vnd.cyclonedx+json"); err != nil {
+		logger.Fatalf("uploading %s/%s: %v", pubBucket, remoteBomPath, err)
+	}
+	if err := pub.PutFile(ctx, pubBucket, remotepath, localpath, "image/tiff"); err != nil {
+		logger.Fatalf("uploading %s/%s: %v", pubBucket, remotepath, err)
+	}
+	logger.Printf("uploaded %s/%s and %s/%s; done, %s",
+		pubBucket, remoteBomPath, pubBucket, remotepath, memStats())
 
-		if err := Cleanup(storage, bucket); err != nil {
-			logger.Fatalf("garbage-collecting old files in storage: %v", err)
-		}
+	if err := Cleanup(storage, bucket, pub, pubBucket); err != nil {
+		logger.Fatalf("garbage-collecting old files in storage: %v", err)
 	}
 }
 

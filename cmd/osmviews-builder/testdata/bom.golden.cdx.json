@@ -83,7 +83,7 @@
       "name": "osmviews",
       "version": "2025-08-30",
       "description": "OpenStreetMap view density, in weekly user views per km2 (Cloud-Optimized GeoTIFF, EPSG:3857, zoom 0-18).",
-      "purl": "pkg:generic/osmviews@2025-08-30?checksum=sha256:98c9734da0a3370f9efc164535ee72d03d91289956117853a158839fcc88da13&download_url=https%3A%2F%2Fosmviews.toolforge.org%2Fdownload%2Fosmviews.tiff",
+      "purl": "pkg:generic/osmviews@2025-08-30?checksum=sha256:98c9734da0a3370f9efc164535ee72d03d91289956117853a158839fcc88da13&download_url=https%3A%2F%2Fosmviews.dandelis.ch%2Fdata%2Fosmviews-20250830.tiff",
       "licenses": [
         {
           "license": {
@@ -104,11 +104,11 @@
       "externalReferences": [
         {
           "type": "distribution",
-          "url": "https://osmviews.toolforge.org/download/osmviews.tiff"
+          "url": "https://osmviews.dandelis.ch/data/osmviews-20250830.tiff"
         },
         {
           "type": "website",
-          "url": "https://osmviews.toolforge.org"
+          "url": "https://osmviews.dandelis.ch"
         },
         {
           "type": "vcs",

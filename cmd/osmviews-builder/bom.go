@@ -35,8 +35,11 @@ const (
 	bomSpecVersion = "1.7"
 	bomSchema      = "http://cyclonedx.org/schema/bom-1.7.schema.json"
 
-	bomWebsiteURL  = "https://osmviews.toolforge.org"
-	bomDownloadURL = bomWebsiteURL + "/download/osmviews.tiff"
+	// bomHost is the canonical host for published data. It is
+	// osmviews.dandelis.ch while the CDN migration (issue #110) is proven on a
+	// staging domain; it becomes osmviews.brawer.ch at the cutover.
+	bomHost        = "osmviews.dandelis.ch"
+	bomWebsiteURL  = "https://" + bomHost
 	bomVCSURL      = "https://github.com/brawer/osmviews"
 	bomBuildSysURL = "https://github.com/brawer/osmviews/actions"
 	bomTileLogsURL = "https://planet.openstreetmap.org/tile_logs/"
@@ -128,12 +131,19 @@ func (in bomInputs) softwarePURL() string {
 	}
 }
 
+// downloadURL is where this build's GeoTIFF is published: a dated, immutable
+// CDN object. It is retained for only the three most recent builds — the BOM's
+// hashes, not this URL, are the durable integrity anchor.
+func (in bomInputs) downloadURL() string {
+	return fmt.Sprintf("https://%s/data/osmviews-%s.tiff", bomHost, in.Date.UTC().Format("20060102"))
+}
+
 // dataPURL is the Package-URL of the GeoTIFF itself: a generic package
 // pinned by version date, carrying its SHA-256 and download URL as
 // qualifiers (sorted, as the purl spec requires).
 func (in bomInputs) dataPURL() string {
 	return fmt.Sprintf("pkg:generic/osmviews@%s?checksum=sha256:%s&download_url=%s",
-		in.Date.UTC().Format("2006-01-02"), in.SHA256, url.QueryEscape(bomDownloadURL))
+		in.Date.UTC().Format("2006-01-02"), in.SHA256, url.QueryEscape(in.downloadURL()))
 }
 
 // bomSupplier is the organizational entity recorded as supplier of the
@@ -194,7 +204,7 @@ func buildBOM(in bomInputs) *cdxBOM {
 			{Alg: "SHA-512", Content: in.SHA512},
 		},
 		ExternalReferences: []cdxExternalRef{
-			{Type: "distribution", URL: bomDownloadURL},
+			{Type: "distribution", URL: in.downloadURL()},
 			{Type: "website", URL: bomWebsiteURL},
 			{Type: "vcs", URL: bomVCSURL},
 		},

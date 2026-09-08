@@ -20,11 +20,12 @@ func TestStorage_Reload(t *testing.T) {
 	storage := &Storage{
 		client: &fakeStorageClient{
 			objects: []minio.ObjectInfo{{
-				Key: "public/osmviews-20211229.tiff", Size: 5,
+				Key: "data/osmviews-20211229.tiff", Size: 5,
 				ETag: "Test-ETag", LastModified: lastmod,
 			}},
-			blobs: map[string][]byte{"public/osmviews-20211229.tiff": []byte("Hello")},
+			blobs: map[string][]byte{"data/osmviews-20211229.tiff": []byte("Hello")},
 		},
+		bucket:  "test-bucket",
 		workdir: t.TempDir(),
 		files:   make(map[string]*localFile, 10),
 	}
@@ -81,6 +82,7 @@ func TestStorage_Reload(t *testing.T) {
 func TestStorage_Retrieve(t *testing.T) {
 	storage := &Storage{
 		client:  &fakeStorageClient{},
+		bucket:  "test-bucket",
 		workdir: t.TempDir(),
 		files:   make(map[string]*localFile, 10),
 	}
@@ -135,6 +137,7 @@ func TestStorage_Retrieve(t *testing.T) {
 func TestStorage_RetrieveErrors(t *testing.T) {
 	storage := &Storage{
 		client:  &fakeStorageClient{},
+		bucket:  "test-bucket",
 		workdir: t.TempDir(),
 		files:   make(map[string]*localFile, 10),
 	}
@@ -169,7 +172,7 @@ func (s *fakeStorageClient) ListObjects(ctx context.Context, bucketName string, 
 }
 
 func (s *fakeStorageClient) FGetObject(ctx context.Context, bucketName, objectName, filePath string, opts minio.GetObjectOptions) error {
-	if body, ok := s.blobs[objectName]; ok && bucketName == "osmviews" {
+	if body, ok := s.blobs[objectName]; ok && bucketName != "" {
 		return os.WriteFile(filePath, body, 0644)
 	}
 	return fmt.Errorf("object not found: %s/%s", bucketName, objectName)
@@ -184,13 +187,14 @@ func TestStorage_Reload_Auxiliary(t *testing.T) {
 		blobs[key] = []byte("{}")
 	}
 	for _, d := range []string{"20260808", "20260815", "20260822", "20260830"} {
-		add("public/osmviews-"+d+".cdx.json", d)
-		add("public/osmviews-stats-"+d+".json", d)
+		add("data/osmviews-"+d+".cdx.json", d)
+		add("data/osmviews-stats-"+d+".json", d)
 	}
-	add("public/osmviews-20260830.tiff", "20260830")
+	add("data/osmviews-20260830.tiff", "20260830")
 
 	s := &Storage{
 		client:  &fakeStorageClient{objects: objs, blobs: blobs},
+		bucket:  "test-bucket",
 		workdir: t.TempDir(),
 		files:   map[string]*localFile{},
 	}
@@ -232,9 +236,9 @@ func TestStorage_Reload_Auxiliary(t *testing.T) {
 
 func TestStorage_objRegexp(t *testing.T) {
 	for _, s := range []string{
-		"public/osmviews-stats-20220631.json",
-		"public/osmviews-20220631.tiff",
-		"public/osmviews-20260830.cdx.json",
+		"data/osmviews-stats-20220631.json",
+		"data/osmviews-20220631.tiff",
+		"data/osmviews-20260830.cdx.json",
 	} {
 		if !objRegexp.MatchString(s) {
 			t.Errorf("should match but does not: %v", s)
@@ -243,7 +247,7 @@ func TestStorage_objRegexp(t *testing.T) {
 
 	for _, s := range []string{
 		"internal/osmviews-builder/foobar.tiff",
-		"public/foobar.csv.gz",
+		"data/foobar.csv.gz",
 	} {
 		if objRegexp.MatchString(s) {
 			t.Errorf("should not match but does: %v", s)

@@ -86,6 +86,13 @@ func NewInternalStorage() (Storage, string, error) {
 	return newRemoteStorage("INTERNAL_S3_", false)
 }
 
+// NewPublicStorage connects to the S3-compatible bucket the CDN serves at
+// <host>/data/*, configured through PUBLIC_S3_ENDPOINT / _KEY / _SECRET /
+// _BUCKET / _REGION. Bunny's S3 gateway requires path-style addressing.
+func NewPublicStorage() (Storage, string, error) {
+	return newRemoteStorage("PUBLIC_S3_", true)
+}
+
 // newRemoteStorage builds a minio client from "<prefix>ENDPOINT", "<prefix>KEY",
 // "<prefix>SECRET" and "<prefix>BUCKET" (all required) plus an optional
 // "<prefix>REGION". pathStyle forces path-style bucket addressing, which some
@@ -120,25 +127,23 @@ func newRemoteStorage(prefix string, pathStyle bool) (Storage, string, error) {
 	return &remoteStorage{client: client}, bucket, nil
 }
 
-func Cleanup(s Storage, bucket string) error {
-	for _, p := range []struct {
-		prefix, pattern string
-		keep            int
-	}{
-		{"internal/osmviews-builder/tilelogs-", `internal/osmviews-builder/tilelogs-\d{4}-W\d{2}(-\d+d)?\.br`, 60},
-		{"public/osmviews-", `public/osmviews-\d{8}\.tiff`, 3},
-		// Dated CycloneDX BOMs (public/osmviews-<date>.cdx.json) are kept
-		// forever: ~3 KB each, a permanent provenance record that downstream
-		// consumers can cite by URL. https://github.com/brawer/osmviews/issues/110
-		//
-		// One-time purge of the retired statistics sidecar (issue #109; the
-		// histogram now lives in the GeoTIFF's GDAL_METADATA tag). keep: 0
-		// deletes every match; remove this line once the bucket is clean.
-		{"public/osmviews-stats-", `public/osmviews-stats-\d{8}\.json`, 0},
-	} {
-		if err := cleanupPath(bucket, p.prefix, p.pattern, p.keep, s); err != nil {
-			return err
-		}
+// Cleanup garbage-collects old objects. Each rule runs against exactly one
+// bucket; keep the internal and public arguments straight, or a keep-N sweep
+// on one bucket deletes from the other.
+//
+// The public bucket keeps only the 3 most recent dated GeoTIFFs (each build
+// supersedes the last). Dated CycloneDX BOMs there are never deleted — ~3 KB
+// each, permanent provenance records (issue #110). The internal bucket keeps a
+// rolling year of weekly tile-log aggregates.
+func Cleanup(internal Storage, internalBucket string, public Storage, publicBucket string) error {
+	if err := cleanupPath(internalBucket,
+		"internal/osmviews-builder/tilelogs-",
+		`internal/osmviews-builder/tilelogs-\d{4}-W\d{2}(-\d+d)?\.br`, 60, internal); err != nil {
+		return err
+	}
+	if err := cleanupPath(publicBucket,
+		"data/osmviews-", `data/osmviews-\d{8}\.tiff`, 3, public); err != nil {
+		return err
 	}
 	return nil
 }
