@@ -5,7 +5,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -16,6 +15,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/brawer/osmviews/v2/internal/version"
 	"github.com/brawer/osmviews/v2/internal/webui"
@@ -32,9 +32,8 @@ var ServerVersion = "OSMViews"
 func main() {
 	ServerVersion = version.Resolve(ServerVersion)
 	port := flag.Int("port", 0, "port for serving HTTP requests")
-	workdir := flag.String("workdir", "webserver-workdir", "path to working directory on local disk")
 	showVersion := flag.Bool("version", false, "print version and exit")
-	dev := flag.Bool("dev", false, "local development: skip object storage, so /download/ 404s but /, /beta/ and /robots.txt work without S3 credentials")
+	dev := flag.Bool("dev", false, "local development: don't poll datapackage.json, so /download/osmviews.tiff returns 503; /, /beta/, /robots.txt and the dated /download/ redirects still work")
 	flag.Parse()
 	if *showVersion {
 		fmt.Println(ServerVersion)
@@ -45,32 +44,23 @@ func main() {
 		*port, _ = strconv.Atoi(os.Getenv("PORT"))
 	}
 
-	if *workdir != "" {
-		if err := os.MkdirAll(*workdir, 0755); err != nil {
-			log.Fatal(err)
-		}
-	}
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	var storage *Storage
+	// The webserver no longer stores anything: it redirects /download/… to the
+	// CDN (issue #110) and only needs the current version date, which it reads
+	// from datapackage.json.
+	manifest := NewManifest(dataBaseURL)
 	if *dev {
-		log.Print("dev mode: object storage disabled, /download/ will return 404")
-		storage = &Storage{files: make(map[string]*localFile)}
+		log.Print("dev mode: not polling datapackage.json; /download/osmviews.tiff will return 503")
 	} else {
-		var err error
-		storage, err = NewStorage(*workdir)
-		if err != nil {
-			log.Fatal(err)
+		if err := manifest.refresh(ctx); err != nil {
+			log.Printf("initial datapackage.json fetch failed, continuing: %v", err)
 		}
-		if err := storage.Reload(context.Background()); err != nil {
-			log.Fatal(err)
-		}
-		go storage.Watch(ctx)
+		go manifest.Watch(ctx, 60*time.Second)
 	}
 
-	server := &Webserver{storage: storage}
+	server := &Webserver{manifest: manifest}
 	http.HandleFunc("/", server.HandleMain)
 	http.HandleFunc("/robots.txt", server.HandleRobotsTxt)
 	http.Handle("/metrics", promhttp.Handler())
@@ -82,7 +72,7 @@ func main() {
 }
 
 type Webserver struct {
-	storage *Storage
+	manifest *Manifest
 }
 
 func (ws *Webserver) HandleMain(w http.ResponseWriter, r *http.Request) {
@@ -166,61 +156,59 @@ width="88" height="31" alt="Public Domain" style="float:left"/></p>
 </body></html>`)
 }
 
+// HandleDownload redirects the legacy /download/ URLs to the CDN (issue #110).
+// This webserver holds no data of its own any more.
+//
+//	/download/osmviews.tiff          302 → <cdn>/data/osmviews-<latest>.tiff
+//	/download/osmviews-<date>.tiff   301 → <cdn>/data/osmviews-<date>.tiff
+//	/download/osmviews-<date>.cdx.json  301 → same
+//	/download/datapackage.json       301 → <cdn>/data/datapackage.json
+//
+// The dated objects are immutable, so those redirects are permanent; the
+// de-dated "latest" one is temporary and its target is the current version
+// from datapackage.json.
 func (ws *Webserver) HandleDownload(w http.ResponseWriter, req *http.Request) {
-	if !strings.HasPrefix(req.URL.Path, "/download/") {
-		http.NotFound(w, req)
-		return
-	}
-
-	path := strings.TrimPrefix(req.URL.Path, "/download/")
-	c, err := ws.storage.Retrieve(path)
-	if err != nil {
-		if !errors.Is(err, ErrNotFound) {
-			// The request path, and the error text that echoes it, are
-			// attacker-influenced: strip line breaks so a crafted path
-			// cannot forge or split log lines.
-			log.Printf("serving /download/%s: %s", stripLineBreaks(path), stripLineBreaks(err.Error()))
-		}
-		http.NotFound(w, req)
-		return
-	}
-	defer c.Close()
-
 	h := w.Header()
 	h.Set("Server", ServerVersion)
+	h.Set("Access-Control-Allow-Origin", "*")
+
+	name := strings.TrimPrefix(req.URL.Path, "/download/")
 
 	switch req.Method {
-	case http.MethodHead:
-		fallthrough
-
-	case http.MethodGet:
-		// As per https://tools.ietf.org/html/rfc7232, ETag must have quotes.
-		h.Set("ETag", fmt.Sprintf(`"%s"`, c.ETag))
-		h.Set("Content-Type", c.ContentType)
-		h.Set("Access-Control-Allow-Origin", "*")
-		http.ServeContent(w, req, "", c.LastModified, c)
-
+	case http.MethodGet, http.MethodHead:
+		// handled below
 	case http.MethodOptions: // CORS pre-flight
 		h.Set("Allow", "GET, HEAD, OPTIONS")
 		h.Set("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS")
-		h.Set("Access-Control-Allow-Headers", "ETag, If-Match, If-None-Match, If-Modified-Since, If-Range, Range")
-		h.Set("Access-Control-Allow-Origin", "*")
-		h.Set("Access-Control-Expose-Headers", "ETag")
+		h.Set("Access-Control-Allow-Headers", "Range, If-Match, If-None-Match, If-Modified-Since, If-Range")
 		h.Set("Access-Control-Max-Age", "86400") // 1 day
 		w.WriteHeader(http.StatusNoContent)
-
+		return
 	default:
 		h.Set("Allow", "GET, HEAD, OPTIONS")
 		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
 	}
-}
 
-// stripLineBreaks removes the CR and LF characters that could otherwise let
-// an attacker-controlled string forge or split entries in a plain-text log.
-func stripLineBreaks(s string) string {
-	s = strings.ReplaceAll(s, "\n", "")
-	s = strings.ReplaceAll(s, "\r", "")
-	return s
+	if name == "osmviews.tiff" {
+		date, ok := ws.manifest.Date()
+		if !ok {
+			http.Error(w, "current version is not known yet", http.StatusServiceUnavailable)
+			return
+		}
+		h.Set("Cache-Control", "no-store")
+		http.Redirect(w, req, dataBaseURL+"/osmviews-"+date+".tiff", http.StatusFound)
+		return
+	}
+
+	// name is fully validated before it reaches the Location header, so this
+	// can only ever redirect to a fixed-shape path under dataBaseURL.
+	if name == "datapackage.json" || datedObjectRegexp.MatchString(name) {
+		http.Redirect(w, req, dataBaseURL+"/"+name, http.StatusMovedPermanently)
+		return
+	}
+
+	http.NotFound(w, req)
 }
 
 // betaFS holds the built frontend single-page app (internal/webui/dist),

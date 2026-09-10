@@ -6,14 +6,10 @@ package main
 import (
 	"io"
 	"io/fs"
-	"log"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 )
 
 func sendRequest(method, path string, reqHeader http.Header) (status int, h http.Header, body []byte, err error) {
@@ -30,219 +26,140 @@ func sendRequest(method, path string, reqHeader http.Header) (status int, h http
 	return res.StatusCode, res.Header, body, nil
 }
 
-func TestWebserver_Download(t *testing.T) {
-	rh := make(http.Header)
-	status, header, body, err := sendRequest("GET", "/download/c.txt", rh)
+// testWebserver knows the current version is 2026-09-06.
+var testWebserver *Webserver = &Webserver{manifest: &Manifest{date: "20260906"}}
+
+const cdn = "https://osmviews.dandelis.ch/data"
+
+func TestWebserver_DownloadLatestRedirect(t *testing.T) {
+	status, header, body, err := sendRequest("GET", "/download/osmviews.tiff", make(http.Header))
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
-
-	if status != http.StatusOK {
-		t.Errorf("want StatusCode %d, got %d", http.StatusOK, status)
+	if status != http.StatusFound {
+		t.Errorf("status = %d, want 302", status)
 	}
-
-	want := "Content"
-	if string(body) != want {
-		t.Errorf(`want body="%s", got "%s"`, want, string(body))
+	if got, want := header.Get("Location"), cdn+"/osmviews-20260906.tiff"; got != want {
+		t.Errorf("Location = %q, want %q", got, want)
 	}
-
-	want = "text/plain"
-	if got := header.Get("Content-Type"); got != want {
-		t.Errorf(`want "Content-Type: %s", got "%s"`, want, got)
+	if got := header.Get("Cache-Control"); got != "no-store" {
+		t.Errorf("Cache-Control = %q, want no-store", got)
 	}
-
-	want = "Tue, 21 Nov 2023 19:20:21 GMT"
-	if got := header.Get("Last-Modified"); got != want {
-		t.Errorf(`expected "Last-Modified: %s", got "%s"`, want, got)
+	if got := header.Get("Access-Control-Allow-Origin"); got != "*" {
+		t.Errorf("Access-Control-Allow-Origin = %q, want *", got)
 	}
-
-	want = `"ETag-123"`
-	if got := header.Get("ETag"); got != want {
-		t.Errorf(`expected "ETag: %s", got "%s"`, want, got)
-	}
-
-	want = "*"
-	if got := header.Get("Access-Control-Allow-Origin"); got != want {
-		t.Errorf(`expected "Access-Control-Allow-Origin: %s", got "%s"`, want, got)
+	if !strings.Contains(string(body), "osmviews-20260906.tiff") {
+		t.Errorf("redirect body = %q, want it to name the target", string(body))
 	}
 }
 
-func TestWebserver_DownloadETagMatch(t *testing.T) {
-	rh := make(http.Header)
-	rh.Set("If-None-Match", `"ETag-123"`)
-	status, header, body, err := sendRequest("GET", "/download/c.txt", rh)
+func TestWebserver_DownloadLatestHEAD(t *testing.T) {
+	status, header, body, err := sendRequest("HEAD", "/download/osmviews.tiff", make(http.Header))
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
-
-	if status != http.StatusNotModified {
-		t.Errorf("want StatusCode %d, got %d", http.StatusNotModified, status)
+	if status != http.StatusFound {
+		t.Errorf("status = %d, want 302", status)
 	}
-
-	if len(body) > 0 {
-		t.Errorf(`want empty body, got "%s"`, string(body))
+	if got, want := header.Get("Location"), cdn+"/osmviews-20260906.tiff"; got != want {
+		t.Errorf("Location = %q, want %q", got, want)
 	}
+	if len(body) != 0 {
+		t.Errorf("HEAD body = %q, want empty", string(body))
+	}
+}
 
-	want := `"ETag-123"`
-	if got := header.Get("ETag"); got != want {
-		t.Errorf(`expected "ETag: %s", got "%s"`, want, got)
+func TestWebserver_DownloadLatestUnknownVersion(t *testing.T) {
+	ws := &Webserver{manifest: &Manifest{}} // no successful poll yet
+	req := httptest.NewRequest("GET", "/download/osmviews.tiff", nil)
+	w := httptest.NewRecorder()
+	ws.HandleDownload(w, req)
+	if w.Result().StatusCode != http.StatusServiceUnavailable {
+		t.Errorf("status = %d, want 503", w.Result().StatusCode)
+	}
+}
+
+func TestWebserver_DownloadDatedRedirects(t *testing.T) {
+	for _, name := range []string{
+		"osmviews-20260830.tiff",
+		"osmviews-20260830.cdx.json",
+		"osmviews-20250101.tiff",
+		"datapackage.json",
+	} {
+		status, header, _, err := sendRequest("GET", "/download/"+name, make(http.Header))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if status != http.StatusMovedPermanently {
+			t.Errorf("%s: status = %d, want 301", name, status)
+		}
+		if got, want := header.Get("Location"), cdn+"/"+name; got != want {
+			t.Errorf("%s: Location = %q, want %q", name, got, want)
+		}
+		if got := header.Get("Access-Control-Allow-Origin"); got != "*" {
+			t.Errorf("%s: Access-Control-Allow-Origin = %q, want *", name, got)
+		}
 	}
 }
 
 func TestWebserver_DownloadNotFound(t *testing.T) {
-	rh := make(http.Header)
-	status, _, _, err := sendRequest("GET", "/download/unkown", rh)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-
-	if status != http.StatusNotFound {
-		t.Errorf("want StatusCode %d, got %d", http.StatusNotFound, status)
+	for _, name := range []string{
+		"unknown",
+		"osmviews-2026.tiff",       // date too short
+		"osmviews-20260830.txt",    // wrong extension
+		"osmviews-20260830.tiff/x", // trailing junk
+		"osmviews.tiff.bak",
+		"../secrets",
+	} {
+		status, _, _, err := sendRequest("GET", "/download/"+name, make(http.Header))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if status != http.StatusNotFound {
+			t.Errorf("%q: status = %d, want 404", name, status)
+		}
 	}
 }
 
 func TestWebserver_DownloadOptions(t *testing.T) {
-	rh := make(http.Header)
-	status, header, body, err := sendRequest("OPTIONS", "/download/c.txt", rh)
+	status, header, body, err := sendRequest("OPTIONS", "/download/osmviews.tiff", make(http.Header))
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
-
 	if status != http.StatusNoContent {
-		t.Errorf("want StatusCode %d, got %d", http.StatusNoContent, status)
+		t.Errorf("status = %d, want 204", status)
 	}
-
 	if len(body) > 0 {
-		t.Errorf(`want empty body, got "%s"`, string(body))
+		t.Errorf("body = %q, want empty", string(body))
 	}
-
-	want := "GET, HEAD, OPTIONS"
-	if got := header.Get("Allow"); got != want {
-		t.Errorf(`expected "Allow: %s", got "%s"`, want, got)
+	for k, want := range map[string]string{
+		"Allow":                        "GET, HEAD, OPTIONS",
+		"Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+		"Access-Control-Allow-Origin":  "*",
+		"Access-Control-Max-Age":       "86400",
+	} {
+		if got := header.Get(k); got != want {
+			t.Errorf("%s = %q, want %q", k, got, want)
+		}
 	}
-	if got := header.Get("Access-Control-Allow-Methods"); got != want {
-		t.Errorf(`expected "Access-Control-Allow-Methods: %s", got "%s"`, want, got)
-	}
-
-	want = "*"
-	if got := header.Get("Access-Control-Allow-Origin"); got != want {
-		t.Errorf(`expected "Access-Control-Allow-Origin: %s", got "%s"`, want, got)
-	}
-
-	want = "ETag, If-Match, If-None-Match, If-Modified-Since, If-Range, Range"
-	if got := header.Get("Access-Control-Allow-Headers"); got != want {
-		t.Errorf(`expected "Access-Control-Allow-Headers: %s", got "%s"`, want, got)
-	}
-
-	want = "ETag"
-	if got := header.Get("Access-Control-Expose-Headers"); got != want {
-		t.Errorf(`expected "Access-Control-Expose-Headers: %s", got "%s"`, want, got)
-	}
-
-	want = "86400"
-	if got := header.Get("Access-Control-Max-Age"); got != want {
-		t.Errorf(`expected "Access-Control-Max-Age: %s", got "%s"`, want, got)
-	}
-
-}
-
-func TestWebserver_DownloadOptionsNotFound(t *testing.T) {
-	rh := make(http.Header)
-	status, _, _, err := sendRequest("OPTIONS", "/download/unkown", rh)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-
-	if status != http.StatusNotFound {
-		t.Errorf("want StatusCode %d, got %d", http.StatusNotFound, status)
+	if got := header.Get("Access-Control-Allow-Headers"); !strings.Contains(strings.ToLower(got), "range") {
+		t.Errorf("Access-Control-Allow-Headers = %q, want it to include Range", got)
 	}
 }
 
 func TestWebserver_DownloadMethodNotAllowed(t *testing.T) {
-	rh := make(http.Header)
-	status, header, body, err := sendRequest("DELETE", "/download/c.txt", rh)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-
-	if status != http.StatusMethodNotAllowed {
-		t.Errorf("want StatusCode %d, got %d", http.StatusMethodNotAllowed, status)
-	}
-
-	if len(body) > 0 {
-		t.Errorf(`want empty body, got "%s"`, string(body))
-	}
-
-	want := "GET, HEAD, OPTIONS"
-	if got := header.Get("Allow"); got != want {
-		t.Errorf(`expected "Allow: %s", got "%s"`, want, got)
-	}
-}
-
-var testWebserver *Webserver = makeTestWebserver()
-
-func makeTestWebserver() *Webserver {
-	storage := &Storage{
-		client:  &fakeStorageClient{},
-		workdir: os.TempDir(),
-		files:   make(map[string]*localFile, 10),
-	}
-
-	path := filepath.Join(storage.workdir, "c.txt")
-	if err := os.WriteFile(path, []byte("Content"), 0644); err != nil {
-		log.Fatal(err)
-	}
-
-	lastmod, _ := time.Parse(time.RFC3339, "2023-11-21T19:20:21Z")
-	storage.files["c.txt"] = &localFile{
-		Path:         path,
-		ContentType:  "text/plain",
-		ETag:         "ETag-123",
-		LastModified: lastmod,
-	}
-
-	tiffPath := filepath.Join(storage.workdir, "t.tiff")
-	if err := os.WriteFile(tiffPath, []byte("II*\x00 fake geotiff"), 0644); err != nil {
-		log.Fatal(err)
-	}
-	storage.files["osmviews.tiff"] = &localFile{
-		Path:         tiffPath,
-		ContentType:  "image/tiff",
-		ETag:         "ETag-tiff",
-		LastModified: lastmod,
-		Version:      "20260830",
-	}
-	bomPath := filepath.Join(storage.workdir, "b.cdx.json")
-	if err := os.WriteFile(bomPath, []byte(`{"bomFormat":"CycloneDX"}`), 0644); err != nil {
-		log.Fatal(err)
-	}
-	storage.files["osmviews-20260830.cdx.json"] = &localFile{
-		Path:         bomPath,
-		ContentType:  bomContentType,
-		ETag:         "ETag-bom",
-		LastModified: lastmod,
-		Version:      "20260830",
-	}
-
-	return &Webserver{storage: storage}
-}
-
-func TestWebserver_DownloadBOMContentType(t *testing.T) {
-	status, header, _, err := sendRequest("GET", "/download/osmviews-20260830.cdx.json", make(http.Header))
+	status, header, body, err := sendRequest("DELETE", "/download/osmviews.tiff", make(http.Header))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if status != http.StatusOK {
-		t.Fatalf("status = %d, want 200", status)
+	if status != http.StatusMethodNotAllowed {
+		t.Errorf("status = %d, want 405", status)
 	}
-	if got := header.Get("Content-Type"); got != "application/vnd.cyclonedx+json" {
-		t.Errorf("Content-Type = %q, want application/vnd.cyclonedx+json", got)
+	if len(body) > 0 {
+		t.Errorf("body = %q, want empty", string(body))
+	}
+	if got := header.Get("Allow"); got != "GET, HEAD, OPTIONS" {
+		t.Errorf("Allow = %q, want GET, HEAD, OPTIONS", got)
 	}
 }
 

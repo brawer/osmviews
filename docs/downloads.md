@@ -5,20 +5,34 @@ SPDX-License-Identifier: MIT
 
 # Downloads & provenance
 
-Every weekly build publishes two files. The GeoTIFF has a stable URL that always
-serves the newest version; the bill of materials is addressed by date so that a
-URL names the exact GeoTIFF it belongs to.
+Every weekly build publishes three files, served from a CDN and listed in a
+small JSON descriptor:
 
-| File | URL | Format | Retention |
-|---|---|---|---|
-| Raster | `https://osmviews.toolforge.org/download/osmviews.tiff` | Cloud-Optimized GeoTIFF, EPSG:3857, zoom 0–18, ~580 MB | latest only |
-| Bill of materials | `…/download/osmviews-<YYYYMMDD>.cdx.json` | [CycloneDX](https://cyclonedx.org) 1.7 JSON | kept indefinitely |
+| File | Format | Retention |
+|---|---|---|
+| `datapackage.json` | [Frictionless Data Package](https://datapackage.org/) v2 | latest only, ~2 KB |
+| `osmviews-<YYYYMMDD>.tiff` | Cloud-Optimized GeoTIFF, EPSG:3857, zoom 0–18, ~580 MB | 3 most recent |
+| `osmviews-<YYYYMMDD>.cdx.json` | [CycloneDX](https://cyclonedx.org) 1.7 bill of materials | kept indefinitely |
 
-`<YYYYMMDD>` is the last day of the most recent tile-log week that went into the
-build — the same date the GeoTIFF carries in its `DateTime` tag.
+`<YYYYMMDD>` is the last day of the most recent tile-log week in the build — the
+same date the GeoTIFF carries in its `DateTime` tag (306).
+
+**Start from the data package** — it names the current version and every file
+by relative path, byte size and SHA-256:
+
+```
+GET https://osmviews.toolforge.org/download/datapackage.json
+```
+
+That URL redirects to the CDN; resolve the `resources[].path` entries against
+the URL you land on. (The CDN's canonical host is becoming
+`osmviews.brawer.ch`; the `osmviews.toolforge.org/download/…` URLs keep working
+as redirects.) The legacy `…/download/osmviews.tiff` also still works — a
+redirect to the current dated GeoTIFF.
 
 Every bill of materials is kept indefinitely (a few kilobytes each), so a dated
-URL stays resolvable for good.
+URL stays resolvable for good. The GeoTIFF itself is "latest plus the two
+previous builds"; for anything older, keep your own copy.
 
 
 ## Pixel values and histogram
@@ -37,34 +51,52 @@ density rounds to zero — most of the planet — so plot the counts on a log
 axis.
 
 
+## The data package
+
+`datapackage.json` is a small [Frictionless v2](https://datapackage.org/)
+descriptor — the single, server-independent entry point:
+
+```json
+{
+  "$schema": "https://datapackage.org/profiles/2.0/datapackage.json",
+  "name": "osmviews",
+  "version": "2026-09-06",
+  "resources": [
+    { "name": "osmviews", "path": "osmviews-20260906.tiff",
+      "bytes": 581137316, "hash": "sha256:be09…" },
+    { "name": "sbom", "path": "osmviews-20260906.cdx.json",
+      "bytes": 6967, "hash": "sha256:4a56…", "describes": "osmviews" }
+  ]
+}
+```
+
+`version` is the build date; every `resources[].path` is a bare filename to
+resolve next to `datapackage.json`. No parser needed — it's a few lines of
+"read JSON, pick a resource, verify the hash".
+
+
 ## Checking for updates
 
-`osmviews.tiff` is refreshed weekly at the same URL. To skip re-downloading
-~580 MB when nothing has changed, poll with an HTTP
-[conditional request](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Conditional_requests):
-keep the `ETag` from your last download and send it back as `If-None-Match`. An
-unchanged file answers `304 Not Modified` with no body; a new build answers
-`200` with the new bytes and a new `ETag` (`Last-Modified` / `If-Modified-Since`
-work too).
+`GET datapackage.json` (~2 KB) and compare `version` to the one you have. Only
+download the raster if it changed — no conditional request against ~580 MB.
 
-```
-curl --etag-compare etag.txt --etag-save etag.txt \
-     -o osmviews.tiff https://osmviews.toolforge.org/download/osmviews.tiff
+```sh
+curl -s https://osmviews.toolforge.org/download/datapackage.json | jq -r .version
 ```
 
 
 ## Which version am I looking at?
 
-The bill of materials is the single source of truth for what a download is and
-how it was made. The GeoTIFF carries its version date in the `DateTime` tag
-(306), and the BOM is named after that same date:
+`datapackage.json` `version` for the current build. For a GeoTIFF you already
+have on disk, its `DateTime` tag (306) holds the build date, and the bill of
+materials is named after it:
 
 ```
-DateTime (306): 2026:08:30 00:00:00  →  /download/osmviews-20260830.cdx.json
+DateTime (306): 2026:09:06 00:00:00  →  osmviews-20260906.cdx.json
 ```
 
-The dated BOM URL is immutable and kept indefinitely, so you can resolve it at
-any time from a GeoTIFF you downloaded earlier.
+That dated BOM URL is immutable and kept indefinitely, so it resolves at any
+time — long after `datapackage.json` has moved on to a newer build.
 
 
 ## The bill of materials
@@ -89,14 +121,18 @@ A [CycloneDX](https://cyclonedx.org) 1.7 document describing one dated GeoTIFF:
 
 ## Verifying a download
 
-1. `GET /download/osmviews.tiff`
-2. read the `DateTime` tag (306) → `osmviews-<YYYYMMDD>.cdx.json` → BOM URL
-3. `GET` the BOM
-4. assert `sha256(step 1 bytes) == metadata.component.hashes["SHA-256"]`
+1. `GET datapackage.json`
+2. resolve the `osmviews` resource's `path`; `GET` it
+3. assert `sha256(step 2 bytes) == resource.hash` (drop the `sha256:` prefix)
+4. for full provenance, `GET` the `sbom` resource and check its
+   `metadata.component.hashes["SHA-256"]` matches too
 
-The BOM URL in step 2 is derived from the bytes you downloaded, so step 4 fails
-only if those bytes are internally inconsistent — a download resumed across a
-weekly update, or a caching proxy mixing builds. If so, re-download and retry.
+If the manifest advanced between steps 1 and 2 (you raced a weekly rebuild),
+step 3 mismatches — re-`GET` `datapackage.json` and retry.
+
+Working from a GeoTIFF you already have instead: read its `DateTime` tag (306),
+`GET` `osmviews-<YYYYMMDD>.cdx.json`, and check
+`sha256(bytes) == metadata.component.hashes["SHA-256"]`.
 
 
 ## Recording OSMViews in your data BOM
