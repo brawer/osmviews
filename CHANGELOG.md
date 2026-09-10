@@ -13,6 +13,17 @@ Conventional Commit history. Versioning follows
 the **minor** version may be breaking — see
 [RELEASING.md](RELEASING.md#choosing-the-version-number).
 
+## [0.3.0](https://github.com/brawer/osmviews/compare/v0.2.0...v0.3.0) (2026-09-10)
+
+
+### ⚠ BREAKING CHANGES
+
+* **webserver:** /download/osmviews.tiff is now a 302 redirect, not the file itself. curl -L, wget, browsers and both client libraries follow it. A client that polled it with If-None-Match for updates should switch to GET datapackage.json and compare `version` (see docs/downloads.md).
+
+### 🆕 Features
+
+* **webserver:** redirect /download/ to the CDN instead of serving files ([7383026](https://github.com/brawer/osmviews/commit/7383026dcf0b9880136b1db98c86d42baeb04bd2))
+
 ## [0.2.0](https://github.com/brawer/osmviews/compare/v0.1.6...v0.2.0) (2026-09-08)
 
 
