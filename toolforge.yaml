@@ -29,7 +29,7 @@ components:
       publish: "/" # serves https://osmviews.toolforge.org/
       port: 8000
       replicas: 1
-      mount: none # rebuilds its local cache from object storage on start
+      mount: none # stateless: redirects /download/ to the CDN (issue #110)
       health_check_http: /robots.txt
       cpu: "1"
       memory: 512M
