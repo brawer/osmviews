@@ -13,6 +13,13 @@ Conventional Commit history. Versioning follows
 the **minor** version may be breaking — see
 [RELEASING.md](RELEASING.md#choosing-the-version-number).
 
+## [0.3.1](https://github.com/brawer/osmviews/compare/v0.3.0...v0.3.1) (2026-09-14)
+
+
+### 🆕 Features
+
+* switch canonical CDN host from dandelis.ch to brawer.ch ([72bff51](https://github.com/brawer/osmviews/commit/72bff5120dce2ed2d561390ed55b8c8f6e82df1f))
+
 ## [0.3.0](https://github.com/brawer/osmviews/compare/v0.2.0...v0.3.0) (2026-09-10)
 
 
