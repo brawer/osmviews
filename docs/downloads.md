@@ -25,10 +25,10 @@ GET https://osmviews.toolforge.org/download/datapackage.json
 ```
 
 That URL redirects to the CDN; resolve the `resources[].path` entries against
-the URL you land on. (The CDN's canonical host is becoming
-`osmviews.brawer.ch`; the `osmviews.toolforge.org/download/…` URLs keep working
-as redirects.) The legacy `…/download/osmviews.tiff` also still works — a
-redirect to the current dated GeoTIFF.
+the URL you land on. (The CDN's canonical host is `osmviews.brawer.ch`; the
+`osmviews.toolforge.org/download/…` URLs keep working as redirects.) The
+legacy `…/download/osmviews.tiff` also still works — a redirect to the
+current dated GeoTIFF.
 
 Every bill of materials is kept indefinitely (a few kilobytes each), so a dated
 URL stays resolvable for good. The GeoTIFF itself is "latest plus the two
