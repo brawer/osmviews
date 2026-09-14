@@ -35,10 +35,8 @@ const (
 	bomSpecVersion = "1.7"
 	bomSchema      = "http://cyclonedx.org/schema/bom-1.7.schema.json"
 
-	// bomHost is the canonical host for published data. It is
-	// osmviews.dandelis.ch while the CDN migration (issue #110) is proven on a
-	// staging domain; it becomes osmviews.brawer.ch at the cutover.
-	bomHost        = "osmviews.dandelis.ch"
+	// bomHost is the canonical host for published data.
+	bomHost        = "osmviews.brawer.ch"
 	bomWebsiteURL  = "https://" + bomHost
 	bomVCSURL      = "https://github.com/brawer/osmviews"
 	bomBuildSysURL = "https://github.com/brawer/osmviews/actions"

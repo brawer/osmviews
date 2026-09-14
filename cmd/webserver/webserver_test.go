@@ -29,7 +29,7 @@ func sendRequest(method, path string, reqHeader http.Header) (status int, h http
 // testWebserver knows the current version is 2026-09-06.
 var testWebserver *Webserver = &Webserver{manifest: &Manifest{date: "20260906"}}
 
-const cdn = "https://osmviews.dandelis.ch/data"
+const cdn = "https://osmviews.brawer.ch/data"
 
 func TestWebserver_DownloadLatestRedirect(t *testing.T) {
 	status, header, body, err := sendRequest("GET", "/download/osmviews.tiff", make(http.Header))

@@ -6,7 +6,7 @@
   "description": "OpenStreetMap view density in weekly user views per km2, as a Cloud-Optimized GeoTIFF (EPSG:3857, zoom 0-18). Rebuilt weekly over a trailing 52-week window.",
   "version": "2025-08-30",
   "created": "2025-08-30T00:00:00Z",
-  "homepage": "https://osmviews.dandelis.ch",
+  "homepage": "https://osmviews.brawer.ch",
   "licenses": [
     {
       "name": "CC0-1.0",

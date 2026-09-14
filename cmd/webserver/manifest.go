@@ -16,9 +16,8 @@ import (
 )
 
 // dataBaseURL is where the CDN serves the published dataset. `/download/…` on
-// this webserver redirects there. Flip this to osmviews.brawer.ch at the
-// dandelis.ch → brawer.ch cutover (issue #110).
-const dataBaseURL = "https://osmviews.dandelis.ch/data"
+// this webserver redirects there.
+const dataBaseURL = "https://osmviews.brawer.ch/data"
 
 // datedObjectRegexp matches the immutable per-build object names the CDN serves
 // under /data/ (and that /download/ redirects to unchanged).
