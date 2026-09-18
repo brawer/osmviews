@@ -59,7 +59,7 @@ func TestHistogram_RATXML(t *testing.T) {
 		`<GDALMetadata><Item name="DEFAULT_RASTER_ATTRIBUTE_TABLE" sample="0" role="rat">`,
 		`<GDALRasterAttributeTable Row0Min="0" BinSize="0.0625" tableType="athematic">`,
 		`<FieldDefn index="0"><Name>min</Name><Type>1</Type><Usage>3</Usage></FieldDefn>`,
-		`<FieldDefn index="2"><Name>count</Name><Type>0</Type><Usage>1</Usage></FieldDefn>`,
+		`<FieldDefn index="2"><Name>count</Name><Type>1</Type><Usage>1</Usage></FieldDefn>`,
 		`<Row index="0"><F>0</F><F>0.0625</F><F>4000000000</F></Row>`,
 		`<Row index="1"><F>0.0625</F><F>0.125</F><F>7</F></Row>`,
 		`</GDALRasterAttributeTable></Item></GDALMetadata>`,
