@@ -74,6 +74,13 @@ func (h *Histogram) numBins() int {
 // read this back through GetDefaultRAT(); older readers ignore the tag and
 // the raster still opens. Field type/usage integers are GDAL's own codes:
 // Real=1, Integer=0; Min=3, Max=4, PixelCount=1.
+//
+// The count column is declared Real (a double), not Integer: GDAL's RAT
+// Integer field is a 32-bit int, and a single bucket — most obviously bucket
+// 0, the unviewed world, but as seen in practice any bucket that a very
+// common density value falls into — regularly holds far more than 2^31-1
+// pixels. A double still represents every count here exactly, since even the
+// full pyramid's pixel total stays well under 2^53.
 func (h *Histogram) RATXML() string {
 	n := h.numBins()
 
@@ -85,7 +92,7 @@ func (h *Histogram) RATXML() string {
 		strconv.FormatFloat(histogramBinSize, 'g', -1, 64))
 	b.WriteString(`<FieldDefn index="0"><Name>min</Name><Type>1</Type><Usage>3</Usage></FieldDefn>`)
 	b.WriteString(`<FieldDefn index="1"><Name>max</Name><Type>1</Type><Usage>4</Usage></FieldDefn>`)
-	b.WriteString(`<FieldDefn index="2"><Name>count</Name><Type>0</Type><Usage>1</Usage></FieldDefn>`)
+	b.WriteString(`<FieldDefn index="2"><Name>count</Name><Type>1</Type><Usage>1</Usage></FieldDefn>`)
 	for i := 0; i < n; i++ {
 		var count int64
 		if i < len(h.counts) {
