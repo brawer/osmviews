@@ -86,7 +86,7 @@ func buildDatapackage(in datapackageInputs) *fdPackage {
 				Hash:        "sha256:" + in.RasterSHA256,
 			},
 			{
-				Name:        "sbom",
+				Name:        "bom",
 				Path:        in.BOMPath,
 				Title:       "CycloneDX 1.7 bill of materials",
 				Description: "Provenance for the raster: producing software (by purl) and dataset identity, anchored on the raster's SHA-256/512.",

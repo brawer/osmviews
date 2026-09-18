@@ -64,7 +64,7 @@ descriptor — the single, server-independent entry point:
   "resources": [
     { "name": "osmviews", "path": "osmviews-20260906.tiff",
       "bytes": 581137316, "hash": "sha256:be09…" },
-    { "name": "sbom", "path": "osmviews-20260906.cdx.json",
+    { "name": "bom", "path": "osmviews-20260906.cdx.json",
       "bytes": 6967, "hash": "sha256:4a56…", "describes": "osmviews" }
   ]
 }
@@ -124,7 +124,7 @@ A [CycloneDX](https://cyclonedx.org) 1.7 document describing one dated GeoTIFF:
 1. `GET datapackage.json`
 2. resolve the `osmviews` resource's `path`; `GET` it
 3. assert `sha256(step 2 bytes) == resource.hash` (drop the `sha256:` prefix)
-4. for full provenance, `GET` the `sbom` resource and check its
+4. for full provenance, `GET` the `bom` resource and check its
    `metadata.component.hashes["SHA-256"]` matches too
 
 If the manifest advanced between steps 1 and 2 (you raced a weekly rebuild),

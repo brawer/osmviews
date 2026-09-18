@@ -42,7 +42,7 @@
       "hash": "sha256:98c9734da0a3370f9efc164535ee72d03d91289956117853a158839fcc88da13"
     },
     {
-      "name": "sbom",
+      "name": "bom",
       "path": "osmviews-20250830.cdx.json",
       "title": "CycloneDX 1.7 bill of materials",
       "description": "Provenance for the raster: producing software (by purl) and dataset identity, anchored on the raster's SHA-256/512.",
