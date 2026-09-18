@@ -13,6 +13,14 @@ Conventional Commit history. Versioning follows
 the **minor** version may be breaking — see
 [RELEASING.md](RELEASING.md#choosing-the-version-number).
 
+## [0.3.2](https://github.com/brawer/osmviews/compare/v0.3.1...v0.3.2) (2026-09-18)
+
+
+### 🐞 Fixes
+
+* rename datapackage "sbom" resource to "bom" ([e350e88](https://github.com/brawer/osmviews/commit/e350e881c0f13d2e7f9930e55384e1ea1fe00d91)), closes [#118](https://github.com/brawer/osmviews/issues/118)
+* store RAT histogram counts as Real, not Integer ([9c7e096](https://github.com/brawer/osmviews/commit/9c7e096c53843e13ab9e946bb60b25fc313d1be4)), closes [#124](https://github.com/brawer/osmviews/issues/124)
+
 ## [0.3.1](https://github.com/brawer/osmviews/compare/v0.3.0...v0.3.1) (2026-09-14)
 
 
