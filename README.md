@@ -16,12 +16,17 @@ World-wide ranking of geographic locations based on OpenStreetMap tile logs.
 Updated weekly. Aggregated over the past 52 weeks to smoothen seasonal effects.
 For any location on the planet, up to ~150m/z18 resolution.
 
+**See the current data on a map at <https://osmviews.brawer.ch>.**
+
 
 ## Code repository
 
 * `cmd/webserver` is the [OSMViews webserver](https://osmviews.toolforge.org).
 * `cmd/osmviews-builder` is the pipeline that computes the data.
 * `docs` contains further [documentation](docs/).
+
+The [map web app](https://osmviews.brawer.ch) is maintained in
+[brawer/osmviews-app](https://github.com/brawer/osmviews-app).
 
 Client libraries are maintained in separate repositories:
 
