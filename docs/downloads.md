@@ -25,10 +25,7 @@ GET https://osmviews.brawer.ch/data/datapackage.json
 ```
 
 Resolve the `resources[].path` entries against that URL, i.e. under
-`https://osmviews.brawer.ch/data/`. The older
-`https://osmviews.toolforge.org/download/…` URLs keep working as redirects to
-it; `https://osmviews.toolforge.org/download/osmviews.tiff` redirects to the
-current dated GeoTIFF, for clients that want a fixed "latest" URL.
+`https://osmviews.brawer.ch/data/`.
 
 Every bill of materials is kept indefinitely (a few kilobytes each), so a dated
 URL stays resolvable for good. The GeoTIFF itself is "latest plus the two
@@ -78,7 +75,7 @@ resolve next to `datapackage.json`. No parser needed — it's a few lines of
 ## Checking for updates
 
 `GET datapackage.json` (~2 KB) and compare `version` to the one you have. Only
-download the raster if it changed — no conditional request against ~580 MB.
+download the raster if it changed.
 
 ```sh
 curl -s https://osmviews.brawer.ch/data/datapackage.json | jq -r .version

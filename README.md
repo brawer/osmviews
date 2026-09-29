@@ -41,9 +41,7 @@ Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
 Start from **<https://osmviews.brawer.ch/data/datapackage.json>**, which names
 the current weekly build and its files: a Cloud-Optimized GeoTIFF and a
 [CycloneDX](https://cyclonedx.org) bill of materials, both addressed by date.
-The pixel-value histogram is embedded in the GeoTIFF. For a fixed URL,
-<https://osmviews.toolforge.org/download/osmviews.tiff> always redirects to the
-latest GeoTIFF.
+The pixel-value histogram is embedded in the GeoTIFF.
 
 See [`docs/downloads.md`](docs/downloads.md) for the URLs, how to check for
 updates without re-downloading, the integrity digests, how to tie a download
