@@ -25,12 +25,21 @@ jobs:
       # revision), which is also what the Toolforge buildpack build gets.
       run: make build
     - name: Install golangci-lint
-      uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
-      with:
-        # Keep in sync with CONTRIBUTING.md.
-        version: v2.14.0
-        # Only install it; "make lint" runs it, as locally.
-        install-only: true
+      # A pinned release binary, verified by its SHA-256, rather than
+      # golangci/golangci-lint-action: this repository only allows actions
+      # by GitHub and verified creators. Keep the version in sync with
+      # CONTRIBUTING.md.
+      env:
+        VERSION: 2.14.0
+        SHA256: ab90aeb7b066f92a33415b638a50fe5344bbb75a0d32ad30cc248d88f81032ab
+      run: |
+          set -euo pipefail
+          name="golangci-lint-$VERSION-linux-amd64"
+          curl -sSfL -o "$RUNNER_TEMP/$name.tar.gz" \
+            "https://github.com/golangci/golangci-lint/releases/download/v$VERSION/$name.tar.gz"
+          echo "$SHA256  $RUNNER_TEMP/$name.tar.gz" | sha256sum --check --strict
+          tar -xzf "$RUNNER_TEMP/$name.tar.gz" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/$name" >> "$GITHUB_PATH"
     - name: Lint
       run: make lint
     - name: Test
