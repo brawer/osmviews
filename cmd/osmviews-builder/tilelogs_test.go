@@ -8,7 +8,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -32,7 +31,7 @@ func (f *FakeOSMPlanet) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	if f.Broken {
 		header.Add("Content-Type", "text/plain")
-		body := ioutil.NopCloser(bytes.NewBufferString("Service Unavailable"))
+		body := io.NopCloser(bytes.NewBufferString("Service Unavailable"))
 		return &http.Response{StatusCode: 503, Body: body, Header: header}, nil
 	}
 
@@ -53,7 +52,7 @@ func (f *FakeOSMPlanet) RoundTrip(req *http.Request) (*http.Response, error) {
 			".txt.xz")
 		if f.MissingDays[date] {
 			header.Add("Content-Type", "text/html")
-			body := ioutil.NopCloser(bytes.NewBufferString("Not Found"))
+			body := io.NopCloser(bytes.NewBufferString("Not Found"))
 			return &http.Response{StatusCode: 404, Body: body, Header: header}, nil
 		}
 
@@ -155,7 +154,7 @@ func (f *flakyTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		h.Set("Content-Type", "text/plain")
 		return &http.Response{
 			StatusCode: f.statusCode,
-			Body:       ioutil.NopCloser(strings.NewReader("nope")),
+			Body:       io.NopCloser(strings.NewReader("nope")),
 			Header:     h,
 		}, nil
 	}
@@ -260,7 +259,7 @@ func TestFetchTileLogFile_NotFound(t *testing.T) {
 
 func TestGetTileLogs(t *testing.T) {
 	client := &http.Client{Transport: &FakeOSMPlanet{}}
-	workdir, err := ioutil.TempDir("", "tilelogs_test")
+	workdir, err := os.MkdirTemp("", "tilelogs_test")
 	if err != nil {
 		t.Error(err)
 		return
@@ -394,7 +393,7 @@ func TestGetTileLogsPartialWeek(t *testing.T) {
 		"2567-03-16": true,
 		"2567-03-22": true,
 	}}}
-	workdir, err := ioutil.TempDir("", "tilelogs_test")
+	workdir, err := os.MkdirTemp("", "tilelogs_test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -421,7 +420,7 @@ func TestGetTileLogsPartialWeek(t *testing.T) {
 
 func TestGetTileLogsCachedInStorage(t *testing.T) {
 	ctx := context.Background()
-	workdir, err := ioutil.TempDir("", "tilelogs_test")
+	workdir, err := os.MkdirTemp("", "tilelogs_test")
 	if err != nil {
 		t.Error(err)
 		return
@@ -448,7 +447,9 @@ func TestGetTileLogsCachedInWorkdir(t *testing.T) {
 
 	workdir, _ := os.MkdirTemp("", "tilelogs_test")
 	path := filepath.Join(workdir, "tilelogs-2051-W17.br")
-	os.WriteFile(path, foo_br, 0644)
+	if err := os.WriteFile(path, foo_br, 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	s := NewFakeStorage()
 	reader, err := GetTileLogs("2051-W17", 7, nil, workdir, s, "osmviews")

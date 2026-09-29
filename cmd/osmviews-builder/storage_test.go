@@ -169,7 +169,7 @@ func (s *FakeStorage) PutFile(ctx context.Context, bucket string, remotepath str
 	}
 
 	digest := md5.Sum(content)
-	etag := base64.RawStdEncoding.EncodeToString(digest[0:len(digest)])
+	etag := base64.RawStdEncoding.EncodeToString(digest[0:])
 	info := ObjectInfo{
 		Key:         remotepath,
 		ContentType: contentType,

@@ -25,13 +25,20 @@ git clone https://github.com/brawer/osmviews.git
 cd osmviews
 go build ./...
 go test ./...
-go vet ./...
-gofmt -l .          # should print nothing
+make lint
 ```
 
-CI (`.github/workflows/build-test.yml`) runs `go build`, `go vet` and
-`go test -v ./...` and must be green before a pull request can merge. Keep
-`gofmt` clean.
+`make lint` runs [golangci-lint](https://golangci-lint.run/), configured in
+[`.golangci.yml`](.golangci.yml). It includes `go vet`, `staticcheck`,
+unchecked-error and unused-code checks, and fails on files that aren't
+`gofmt -s` formatted. Install the version CI uses with
+`go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0`,
+or the latest release with `brew install golangci-lint`.
+`golangci-lint fmt` fixes the formatting.
+
+CI (`.github/workflows/build-test.yml`) runs `make build`, `make lint` and
+`make test` and must be green before a pull request can merge. Run `make ci`
+to do all of them locally before pushing.
 
 The [defensive publication](docs/defensive-publication) explains how the
 pipeline works — the tile-key ordering, the streaming raster build, and the
