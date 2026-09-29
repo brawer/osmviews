@@ -46,6 +46,14 @@ components:
       # --workdir if ephemeral disk ever becomes the limit.
       mount: none
       retry: 0
-      cpu: "2"
+      # Fail a run that hasn't finished after 3 hours. A run takes about 2h
+      # on 1 CPU. Without this, a stuck run blocks every later one, e.g. a
+      # pod whose image digest was deleted from Harbor sat in
+      # ImagePullBackOff from 2026-09-10 to 09-29 without failing or
+      # sending email.
+      timeout: 10800
+      # 1 CPU: Toolforge is often short on CPU, so a 2-CPU request can wait
+      # Pending for hours, while painting on 1 CPU is fast enough.
+      cpu: "1"
       memory: 3G
       emails: onfailure
