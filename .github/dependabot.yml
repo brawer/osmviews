@@ -25,13 +25,3 @@ updates:
       github-actions:
         patterns: ["*"]
 
-  - package-ecosystem: npm
-    directory: /
-    schedule:
-      interval: monthly
-    commit-message:
-      prefix: chore
-      include: scope
-    groups:
-      npm-dependencies:
-        patterns: ["*"]

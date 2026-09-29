@@ -17,8 +17,6 @@ object — the current version comes from polling `datapackage.json`; every othe
 [`docs/downloads.md`](../../docs/downloads.md) and
 [issue #110](https://github.com/brawer/osmviews/issues/110).
 
-Under `/beta/` it serves an embedded single-page app (built from
-[`../../frontend/`](../../frontend/) into `internal/webui/dist`, see
-[`internal/webui`](../../internal/webui)). This is work in progress —
-[issue #100](https://github.com/brawer/osmviews/issues/100) — and is `noindex` /
-`Disallow`ed for now.
+The interactive map lives in its own repository,
+[brawer/osmviews-app](https://github.com/brawer/osmviews-app), and is served
+at [osmviews.brawer.ch](https://osmviews.brawer.ch/).
