@@ -13,6 +13,13 @@ Conventional Commit history. Versioning follows
 the **minor** version may be breaking — see
 [RELEASING.md](RELEASING.md#choosing-the-version-number).
 
+## [0.3.3](https://github.com/brawer/osmviews/compare/v0.3.2...v0.3.3) (2026-09-29)
+
+
+### 🐞 Fixes
+
+* time out stuck builder runs and request 1 CPU ([6dc3beb](https://github.com/brawer/osmviews/commit/6dc3beb0a0e2ff92b26806e613cf977b467fea8d))
+
 ## [0.3.2](https://github.com/brawer/osmviews/compare/v0.3.1...v0.3.2) (2026-09-18)
 
 
