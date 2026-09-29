@@ -66,7 +66,7 @@ func wantPixels(t *testing.T, got [256 * 256]float32, want [4][4]float32) {
 
 func TestRasterWriter_writeIFDList(t *testing.T) {
 	f := &writerseeker.WriterSeeker{}
-	f.Write([]byte{
+	if _, err := f.Write([]byte{
 		// Byte 0..3: File magic for Little-Endian TIFF less than 4GiB.
 		'I', 'I', 42, 0,
 
@@ -86,7 +86,9 @@ func TestRasterWriter_writeIFDList(t *testing.T) {
 		1, 0, // numEntries
 		0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, // entry #0
 		0xde, 0xad, 0xbe, 0xef, // Bytes 56..59: nextOffset, overwritten
-	})
+	}); err != nil {
+		t.Fatal(err)
+	}
 	r := &RasterWriter{
 		zoom:       2,
 		ifdPos:     []int64{42, 0, 12},
@@ -101,14 +103,18 @@ func TestRasterWriter_writeIFDList(t *testing.T) {
 	p := int64(4)
 	for {
 		var ifd uint32
-		binary.Read(bytes.NewReader(b[p:p+4]), binary.LittleEndian, &ifd)
+		if err := binary.Read(bytes.NewReader(b[p:p+4]), binary.LittleEndian, &ifd); err != nil {
+			t.Fatal(err)
+		}
 		if ifd == 0 {
 			break
 		}
 		got = append(got, ifd)
 		p = int64(ifd)
 		var numEntries uint16
-		binary.Read(bytes.NewReader(b[p:p+2]), binary.LittleEndian, &numEntries)
+		if err := binary.Read(bytes.NewReader(b[p:p+2]), binary.LittleEndian, &numEntries); err != nil {
+			t.Fatal(err)
+		}
 		p += int64(2 + numEntries*12)
 	}
 
@@ -120,7 +126,9 @@ func TestRasterWriter_writeIFDList(t *testing.T) {
 
 func TestRasterWriter_writeTileByteCounts_singleTile(t *testing.T) {
 	f := &writerseeker.WriterSeeker{}
-	f.Write([]byte{0, 1, 2, 3, 4, 5, 6, 7})
+	if _, err := f.Write([]byte{0, 1, 2, 3, 4, 5, 6, 7}); err != nil {
+		t.Fatal(err)
+	}
 	r := &RasterWriter{
 		tileByteCounts:    [][]uint32{{0xfffefdfc}},
 		tileByteCountsPos: []int64{2},
@@ -142,7 +150,9 @@ func TestRasterWriter_writeTileByteCounts_singleTile(t *testing.T) {
 
 func TestRasterWriter_writeTileByteCounts_multiTile(t *testing.T) {
 	f := &writerseeker.WriterSeeker{}
-	f.Write([]byte{0, 1, 2, 3, 4, 5, 6, 7})
+	if _, err := f.Write([]byte{0, 1, 2, 3, 4, 5, 6, 7}); err != nil {
+		t.Fatal(err)
+	}
 	r := &RasterWriter{
 		tileByteCounts:    [][]uint32{{0xfffefdfc, 0x28272625}},
 		tileByteCountsPos: []int64{2},
@@ -165,8 +175,13 @@ func TestRasterWriter_writeTileByteCounts_multiTile(t *testing.T) {
 func TestRasterWriter_writeTileByteCounts_padding(t *testing.T) {
 	for i := 0; i < 4; i++ {
 		f := &writerseeker.WriterSeeker{}
-		f.Write([]byte{'I', 'I', 42, 0, 4, 5, 6, 7})
-		f.Write([]byte{8, 9, 10, 11}[:i]) // inject bytes to force alignment
+		if _, err := f.Write([]byte{'I', 'I', 42, 0, 4, 5, 6, 7}); err != nil {
+			t.Fatal(err)
+		}
+		// Inject bytes to force alignment.
+		if _, err := f.Write([]byte{8, 9, 10, 11}[:i]); err != nil {
+			t.Fatal(err)
+		}
 		r := &RasterWriter{
 			tileByteCounts:    [][]uint32{{0xcafe, 0xbeef}},
 			tileByteCountsPos: []int64{4},
@@ -184,7 +199,9 @@ func TestRasterWriter_writeTileByteCounts_padding(t *testing.T) {
 		}
 
 		var offset uint32
-		binary.Read(bytes.NewReader(b[4:8]), binary.LittleEndian, &offset)
+		if err := binary.Read(bytes.NewReader(b[4:8]), binary.LittleEndian, &offset); err != nil {
+			t.Fatal(err)
+		}
 
 		wantOffset, wantLen := uint32(8), 16
 		if i > 0 {
