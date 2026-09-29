@@ -47,6 +47,11 @@ ignore the tag and the raster still opens. Bucket 0 holds every pixel whose
 density rounds to zero — most of the planet — so plot the counts on a log
 axis.
 
+**Known gap:** since June 2026, OpenStreetMap has published tile logs for only
+2–5 days a week
+([openstreetmap/operations#1398](https://github.com/openstreetmap/operations/issues/1398)).
+Counts for those weeks are scaled up from the days available.
+
 
 ## The data package
 
