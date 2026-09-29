@@ -79,7 +79,9 @@ func (t *TiffReader) readFirstIFD() error {
 			if err := binary.Read(&ifd, t.order, &sval1); err != nil {
 				return err
 			}
-			binary.Read(&ifd, t.order, &sval2)
+			if err := binary.Read(&ifd, t.order, &sval2); err != nil {
+				return err
+			}
 			value = uint32(sval1)
 
 		case 11: // FLOAT

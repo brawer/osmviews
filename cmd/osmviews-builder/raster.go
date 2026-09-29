@@ -122,7 +122,6 @@ type RasterWriter struct {
 	path         string
 	tempFile     *os.File
 	tempFileSize uint64
-	dataSize     uint64
 	zoom         uint8
 	maxValue     float32
 	hist         Histogram // pixel-value histogram of the main image; GDAL_METADATA tag (42112)
@@ -357,7 +356,7 @@ KNOWN_INCOMPATIBLE_EDITION=NO
 	}
 
 	var buf bytes.Buffer
-	buf.WriteString(fmt.Sprintf("GDAL_STRUCTURAL_METADATA_SIZE=%06d bytes\n", len(smd)))
+	fmt.Fprintf(&buf, "GDAL_STRUCTURAL_METADATA_SIZE=%06d bytes\n", len(smd))
 	buf.WriteString(smd)
 	if err := addPadding(&buf); err != nil {
 		return err
@@ -642,7 +641,6 @@ func (w *RasterWriter) writeIFD(zoom uint8, f *os.File) error {
 		panic("fileSize != extraPos")
 	}
 
-	fileSize += int64(extraBuf.Len())
 	if _, err := extraBuf.WriteTo(f); err != nil {
 		return err
 	}

@@ -18,7 +18,9 @@ func TestManifest_Refresh(t *testing.T) {
 			t.Errorf("unexpected request path %q", r.URL.Path)
 		}
 		w.WriteHeader(status)
-		w.Write([]byte(body))
+		if _, err := w.Write([]byte(body)); err != nil {
+			t.Error(err)
+		}
 	}))
 	defer srv.Close()
 

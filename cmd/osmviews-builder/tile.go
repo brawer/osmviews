@@ -171,7 +171,7 @@ func (c TileCount) ToBytes() []byte {
 // TileCountFromBytes de-serializes a TileCount from a byte array.
 // The result is returned as an extsort.SortType because that is
 // needed by the library for external sorting.
-func TileCountFromBytes(b []byte) extsort.SortType {
+func TileCountFromBytes(b []byte) extsort.SortType { //nolint:staticcheck // deprecated extsort API, see #136
 	x, pos := binary.Uvarint(b)
 	y, len := binary.Uvarint(b[pos:])
 	pos += len
@@ -185,7 +185,7 @@ func TileCountFromBytes(b []byte) extsort.SortType {
 // TileCountLess returns true if TileCount a should be sorted before b.
 // The arguments are passed as extsort.SortType because that is
 // needed by the library for external sorting.
-func TileCountLess(a, b extsort.SortType) bool {
+func TileCountLess(a, b extsort.SortType) bool { //nolint:staticcheck // deprecated extsort API, see #136
 	aa := a.(TileCount)
 	bb := b.(TileCount)
 	if aa.Key != bb.Key {

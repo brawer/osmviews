@@ -203,11 +203,11 @@ func GetTileLogs(week string, numDays int, client *http.Client, workdir string, 
 		return nil, err
 	}
 
-	ch := make(chan extsort.SortType, 100000)
+	ch := make(chan extsort.SortType, 100000) //nolint:staticcheck // deprecated extsort API, see #136
 	g, subCtx := errgroup.WithContext(ctx)
 	config := extsort.DefaultConfig()
 	config.NumWorkers = runtime.NumCPU()
-	sorter, outChan, errChan := extsort.New(ch, TileCountFromBytes, TileCountLess, config)
+	sorter, outChan, errChan := extsort.New(ch, TileCountFromBytes, TileCountLess, config) //nolint:staticcheck // deprecated extsort API, see #136
 	g.Go(func() error {
 		return fetchWeeklyTileLogs(week, client, ch, subCtx)
 	})
@@ -288,7 +288,7 @@ func GetTileLogs(week string, numDays int, client *http.Client, workdir string, 
 	}
 }
 
-func fetchWeeklyTileLogs(week string, client *http.Client, ch chan<- extsort.SortType, ctx context.Context) error {
+func fetchWeeklyTileLogs(week string, client *http.Client, ch chan<- extsort.SortType, ctx context.Context) error { //nolint:staticcheck // deprecated extsort API, see #136
 	defer close(ch)
 
 	// Fetch the tile logs for each day of this week that OpenStreetMap
@@ -311,7 +311,7 @@ func fetchWeeklyTileLogs(week string, client *http.Client, ch chan<- extsort.Sor
 	return nil
 }
 
-func fetchTileLogs(day time.Time, client *http.Client, ch chan<- extsort.SortType, ctx context.Context) error {
+func fetchTileLogs(day time.Time, client *http.Client, ch chan<- extsort.SortType, ctx context.Context) error { //nolint:staticcheck // deprecated extsort API, see #136
 	url := fmt.Sprintf(
 		"https://planet.openstreetmap.org/tile_logs/tiles-%04d-%02d-%02d.txt.xz",
 		day.Year(), day.Month(), day.Day())

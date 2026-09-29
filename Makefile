@@ -25,8 +25,9 @@ dev:
 test:
 	go test -v ./...
 
+# golangci-lint, configured in .golangci.yml. Its govet linter covers "go vet".
 lint:
-	go vet ./...
+	golangci-lint run ./...
 
 # Everything CI enforces, for a pre-push check.
 ci:

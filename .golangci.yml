@@ -1,0 +1,20 @@
+# SPDX-FileCopyrightText: 2026 Sascha Brawer <sascha@brawer.ch>
+# SPDX-License-Identifier: MIT
+#
+# golangci-lint configuration, run by "make lint" locally and in CI.
+# https://golangci-lint.run/docs/configuration/file/
+
+version: "2"
+
+linters:
+  # The standard set: errcheck, govet, ineffassign, staticcheck, unused.
+  default: standard
+  exclusions:
+    # Don't flag unchecked errors from Close, fmt.Fprint and the like,
+    # where there is rarely anything useful to do with them.
+    presets:
+      - std-error-handling
+
+formatters:
+  enable:
+    - gofmt
