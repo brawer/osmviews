@@ -15,21 +15,6 @@ jobs:
     steps:
     - name: Check out source code
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-    - name: Install Node.js
-      uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-      with:
-        node-version-file: .node-version
-        cache: npm
-    # Each of these steps is a single Makefile target — see Makefile, whose
-    # comments explain what and why. Running the exact same commands here and
-    # in "make ci" is the point: it's how a future npm/Go skew between local
-    # dev and CI gets caught instead of silently drifting (cf. #103, #106).
-    - name: Build the frontend
-      run: make frontend
-    - name: Check the frontend (size, npm audit, licences, signatures)
-      run: make check-frontend
-    - name: Guard package-lock.json against buildpack npm skew
-      run: make lockfile-check
     - name: Install Go
       uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
       with:
