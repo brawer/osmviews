@@ -14,7 +14,7 @@ authors:
   - family-names: Brawer
     given-names: Sascha
 repository-code: "https://github.com/brawer/osmviews"
-url: "https://osmviews.toolforge.org"
+url: "https://osmviews.brawer.ch"
 license: MIT
 version: 0.3.2 # x-release-please-version
 keywords:

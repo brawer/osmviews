@@ -21,14 +21,11 @@ same date the GeoTIFF carries in its `DateTime` tag (306).
 by relative path, byte size and SHA-256:
 
 ```
-GET https://osmviews.toolforge.org/download/datapackage.json
+GET https://osmviews.brawer.ch/data/datapackage.json
 ```
 
-That URL redirects to the CDN; resolve the `resources[].path` entries against
-the URL you land on. (The CDN's canonical host is `osmviews.brawer.ch`; the
-`osmviews.toolforge.org/download/…` URLs keep working as redirects.) The
-legacy `…/download/osmviews.tiff` also still works — a redirect to the
-current dated GeoTIFF.
+Resolve the `resources[].path` entries against that URL, i.e. under
+`https://osmviews.brawer.ch/data/`.
 
 Every bill of materials is kept indefinitely (a few kilobytes each), so a dated
 URL stays resolvable for good. The GeoTIFF itself is "latest plus the two
@@ -78,10 +75,10 @@ resolve next to `datapackage.json`. No parser needed — it's a few lines of
 ## Checking for updates
 
 `GET datapackage.json` (~2 KB) and compare `version` to the one you have. Only
-download the raster if it changed — no conditional request against ~580 MB.
+download the raster if it changed.
 
 ```sh
-curl -s https://osmviews.toolforge.org/download/datapackage.json | jq -r .version
+curl -s https://osmviews.brawer.ch/data/datapackage.json | jq -r .version
 ```
 
 
