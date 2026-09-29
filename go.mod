@@ -3,27 +3,25 @@
 
 module github.com/brawer/osmviews/v2
 
-go 1.25.0
+go 1.26.0
 
 // +heroku install ./cmd/osmviews-builder ./cmd/webserver
 
 require (
-	github.com/andybalholm/brotli v1.2.3
-	github.com/fogleman/gg v1.3.0
+	github.com/andybalholm/brotli v1.2.5
 	github.com/google/uuid v1.6.0
 	github.com/lanrat/extsort v1.4.2
 	github.com/minio/minio-go/v7 v7.3.0
 	github.com/orcaman/writerseeker v0.0.0-20200621085525-1d3f536ff85e
 	github.com/prometheus/client_golang v1.24.1
-	github.com/ulikunitz/xz v0.5.16
-	golang.org/x/sync v0.22.0
+	github.com/ulikunitz/xz v0.5.17
+	golang.org/x/sync v0.23.0
 )
 
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
-	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
 	github.com/klauspost/compress v1.19.2 // indirect
 	github.com/klauspost/cpuid/v2 v2.4.0 // indirect
 	github.com/klauspost/crc32 v1.3.0 // indirect
@@ -39,7 +37,6 @@ require (
 	github.com/zeebo/xxh3 v1.1.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/crypto v0.55.0 // indirect
-	golang.org/x/image v0.45.0 // indirect
 	golang.org/x/net v0.58.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/text v0.41.0 // indirect
