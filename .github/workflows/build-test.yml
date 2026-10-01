@@ -3,7 +3,13 @@
 
 name: CI
 
-on: [push, pull_request]
+on:
+  push:
+  pull_request:
+  # Weekly, so newly published vulnerabilities (make vulncheck) surface even
+  # when nothing is pushed.
+  schedule:
+    - cron: "17 5 * * 1"
 
 permissions: {}
 
@@ -42,6 +48,10 @@ jobs:
           echo "$RUNNER_TEMP/$name" >> "$GITHUB_PATH"
     - name: Lint
       run: make lint
+    - name: Install govulncheck
+      run: go install golang.org/x/vuln/cmd/govulncheck@v1.8.0
+    - name: Check for known vulnerabilities
+      run: make vulncheck
     - name: Test
       run: make test
     - name: Validate the CycloneDX BOM against the specification

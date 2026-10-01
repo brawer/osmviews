@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	"github.com/brawer/osmviews/v2/internal/version"
@@ -36,7 +37,7 @@ func main() {
 
 	logger := log.Default()
 	logger.SetFlags(log.Ldate | log.Ltime | log.LUTC | log.Lshortfile)
-	logger.Printf("starting %s", SoftwareVersion)
+	logger.Printf("starting %s, built with %s", SoftwareVersion, runtime.Version())
 
 	if *workdir != "" {
 		if err := os.MkdirAll(*workdir, 0755); err != nil {
