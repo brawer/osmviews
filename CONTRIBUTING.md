@@ -40,7 +40,9 @@ or the latest release with `brew install golangci-lint`.
 reports known vulnerabilities that the code actually calls, including in the Go
 standard library. Install it with
 `go install golang.org/x/vuln/cmd/govulncheck@v1.8.0`. If it fails on the
-standard library, raise the `go` line in `go.mod` to a patched release.
+standard library, raise the `toolchain` line in `go.mod` to a patched release.
+Leave the `go` line at a version the Toolforge Go buildpack knows (it
+installs that version, which then downloads the `toolchain` one).
 
 CI (`.github/workflows/build-test.yml`) runs `make build`, `make lint`,
 `make vulncheck` and `make test` and must be green before a pull request can
