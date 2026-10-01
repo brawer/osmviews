@@ -6,7 +6,8 @@
 # two can't drift). See cmd/webserver/README.md,
 # cmd/osmviews-builder/README.md.
 
-.PHONY: build webserver builder dev test lint vulncheck ci clean
+.PHONY: build webserver builder dev test lint vulncheck check-datapackage \
+	ci clean
 
 # Build both binaries, matching CI's "Build" step.
 build: webserver builder
@@ -34,12 +35,24 @@ lint:
 vulncheck:
 	govulncheck ./...
 
+# Validate the data package golden file, which TestWriteDatapackage_Golden
+# keeps identical to the builder's output, against the Frictionless v2 profile
+# it declares as its $schema. check-jsonschema rather than a Go validator,
+# because the profile's path patterns use ECMAScript lookaheads that Go's
+# regexp package cannot compile. Needs pipx (preinstalled on GitHub runners).
+CHECK_JSONSCHEMA = pipx run check-jsonschema==0.38.2
+check-datapackage:
+	$(CHECK_JSONSCHEMA) \
+		--schemafile https://datapackage.org/profiles/2.0/datapackage.json \
+		cmd/osmviews-builder/testdata/datapackage.golden.json
+
 # Everything CI enforces, for a pre-push check.
 ci:
 	$(MAKE) lint
 	$(MAKE) vulncheck
 	go build ./...
 	$(MAKE) test
+	$(MAKE) check-datapackage
 
 clean:
 	rm -f webserver builder

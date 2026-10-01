@@ -44,9 +44,13 @@ standard library, raise the `toolchain` line in `go.mod` to a patched release.
 Leave the `go` line at a version the Toolforge Go buildpack knows (it
 installs that version, which then downloads the `toolchain` one).
 
+`make check-datapackage` validates the data package golden file against the
+Frictionless v2 profile with `pipx run check-jsonschema`. Without pipx, use
+`make check-datapackage CHECK_JSONSCHEMA="uvx check-jsonschema==0.38.2"`.
+
 CI (`.github/workflows/build-test.yml`) runs `make build`, `make lint`,
-`make vulncheck` and `make test` and must be green before a pull request can
-merge. It also runs weekly, to catch newly published vulnerabilities. Run `make ci`
+`make vulncheck`, `make test` and `make check-datapackage` and must be green
+before a pull request can merge. It also runs weekly, to catch newly published vulnerabilities. Run `make ci`
 to do all of them locally before pushing.
 
 The [defensive publication](docs/defensive-publication) explains how the
