@@ -6,7 +6,7 @@
 # two can't drift). See cmd/webserver/README.md,
 # cmd/osmviews-builder/README.md.
 
-.PHONY: build webserver builder dev test lint ci clean
+.PHONY: build webserver builder dev test lint vulncheck ci clean
 
 # Build both binaries, matching CI's "Build" step.
 build: webserver builder
@@ -29,9 +29,15 @@ test:
 lint:
 	golangci-lint run ./...
 
+# Known vulnerabilities that the code actually calls, in dependencies and in
+# the standard library of the Go version running the scan (pinned in go.mod).
+vulncheck:
+	govulncheck ./...
+
 # Everything CI enforces, for a pre-push check.
 ci:
 	$(MAKE) lint
+	$(MAKE) vulncheck
 	go build ./...
 	$(MAKE) test
 

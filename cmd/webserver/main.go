@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -61,7 +62,8 @@ func main() {
 	http.HandleFunc("/robots.txt", server.HandleRobotsTxt)
 	http.Handle("/metrics", promhttp.Handler())
 	http.HandleFunc("/download/", server.HandleDownload)
-	log.Printf("%s listening for HTTP requests on port %d", ServerVersion, *port)
+	log.Printf("%s, built with %s, listening for HTTP requests on port %d",
+		ServerVersion, runtime.Version(), *port)
 	err := http.ListenAndServe(":"+strconv.Itoa(*port), nil)
 	log.Fatalf("HTTP server stopped: %v", err)
 }

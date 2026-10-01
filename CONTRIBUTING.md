@@ -36,8 +36,15 @@ unchecked-error and unused-code checks, and fails on files that aren't
 or the latest release with `brew install golangci-lint`.
 `golangci-lint fmt` fixes the formatting.
 
-CI (`.github/workflows/build-test.yml`) runs `make build`, `make lint` and
-`make test` and must be green before a pull request can merge. Run `make ci`
+`make vulncheck` runs [govulncheck](https://go.dev/doc/security/vuln/), which
+reports known vulnerabilities that the code actually calls, including in the Go
+standard library. Install it with
+`go install golang.org/x/vuln/cmd/govulncheck@v1.8.0`. If it fails on the
+standard library, raise the `go` line in `go.mod` to a patched release.
+
+CI (`.github/workflows/build-test.yml`) runs `make build`, `make lint`,
+`make vulncheck` and `make test` and must be green before a pull request can
+merge. It also runs weekly, to catch newly published vulnerabilities. Run `make ci`
 to do all of them locally before pushing.
 
 The [defensive publication](docs/defensive-publication) explains how the
