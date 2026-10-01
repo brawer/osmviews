@@ -54,6 +54,8 @@ jobs:
       run: make vulncheck
     - name: Test
       run: make test
+    - name: Validate the data package against the Frictionless v2 profile
+      run: make check-datapackage
     - name: Validate the CycloneDX BOM against the specification
       # cmd/osmviews-builder/bom.go generates the BOM; the golden test fixture
       # is a representative instance kept byte-identical by TestWriteBOM_Golden.
