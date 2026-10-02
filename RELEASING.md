@@ -70,13 +70,25 @@ deployment builds `main` at `HEAD` (`toolforge.yaml` pins `ref: main`), so
 curl -sI https://osmviews.toolforge.org/ | grep -i '^server:'
 # → OSMViews/vX.Y.Z+<commit>
 
-# The daily job produces a fresh GeoTIFF within a day:
-curl -sI https://osmviews.toolforge.org/download/osmviews.tiff | grep -i last-modified
+# The webserver was built with the Go toolchain that go.mod names:
+ssh login.toolforge.org
+become osmviews
+kubectl logs deployment/webserver | grep 'built with'
+# → OSMViews/vX.Y.Z+<commit>, built with go1.27.1, listening …
+
+# The latest published build (the query string bypasses a stale CDN copy,
+# see brawer/production#43):
+curl -s "https://osmviews.brawer.ch/data/datapackage.json?t=$(date +%s)" | jq -r .version
 ```
 
 The version comes from `internal/version/release.go` (set by release-please,
 compiled in by the buildpack); the `+<commit>` suffix is the exact source
 revision. The GeoTIFF's TIFF 6.0 Software tag (305) carries the same string.
+
+A release doesn't trigger a new build: the daily builder publishes a week only
+once its tile logs are complete, a few days after the week ends, and skips
+weeks it has already published. Its startup log line also says which Go
+version it was built with.
 
 ## If the automatic deploy fails
 
