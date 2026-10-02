@@ -203,11 +203,12 @@ func GetTileLogs(week string, numDays int, client *http.Client, workdir string, 
 		return nil, err
 	}
 
-	ch := make(chan extsort.SortType, 100000) //nolint:staticcheck // deprecated extsort API, see #136
+	ch := make(chan TileCount, 100000)
 	g, subCtx := errgroup.WithContext(ctx)
 	config := extsort.DefaultConfig()
 	config.NumWorkers = runtime.NumCPU()
-	sorter, outChan, errChan := extsort.New(ch, TileCountFromBytes, TileCountLess, config) //nolint:staticcheck // deprecated extsort API, see #136
+	toBytes := func(c TileCount) ([]byte, error) { return c.ToBytes(), nil }
+	sorter, outChan, errChan := extsort.Generic(ch, TileCountFromBytes, toBytes, TileCountCompare, config)
 	g.Go(func() error {
 		return fetchWeeklyTileLogs(week, client, ch, subCtx)
 	})
@@ -234,8 +235,7 @@ func GetTileLogs(week string, numDays int, client *http.Client, workdir string, 
 	defer writer.Close()
 
 	var last TileCount
-	for data := range outChan {
-		cur := data.(TileCount)
+	for cur := range outChan {
 		if cur.Key != last.Key {
 			if last.Count > 0 {
 				zoom, x, y := last.Key.ZoomXY()
@@ -288,7 +288,7 @@ func GetTileLogs(week string, numDays int, client *http.Client, workdir string, 
 	}
 }
 
-func fetchWeeklyTileLogs(week string, client *http.Client, ch chan<- extsort.SortType, ctx context.Context) error { //nolint:staticcheck // deprecated extsort API, see #136
+func fetchWeeklyTileLogs(week string, client *http.Client, ch chan<- TileCount, ctx context.Context) error {
 	defer close(ch)
 
 	// Fetch the tile logs for each day of this week that OpenStreetMap
@@ -311,7 +311,7 @@ func fetchWeeklyTileLogs(week string, client *http.Client, ch chan<- extsort.Sor
 	return nil
 }
 
-func fetchTileLogs(day time.Time, client *http.Client, ch chan<- extsort.SortType, ctx context.Context) error { //nolint:staticcheck // deprecated extsort API, see #136
+func fetchTileLogs(day time.Time, client *http.Client, ch chan<- TileCount, ctx context.Context) error {
 	url := fmt.Sprintf(
 		"https://planet.openstreetmap.org/tile_logs/tiles-%04d-%02d-%02d.txt.xz",
 		day.Year(), day.Month(), day.Day())

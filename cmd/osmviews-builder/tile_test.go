@@ -4,10 +4,15 @@
 package main
 
 import (
+	"bytes"
+	"context"
 	"fmt"
 	"math"
 	"math/rand"
+	"slices"
 	"testing"
+
+	"github.com/lanrat/extsort"
 )
 
 func ExampleTileKey_String() {
@@ -411,10 +416,88 @@ func ExampleParseTileCount() {
 func TestTileCountRoundTrip(t *testing.T) {
 	for _, key := range makeTestTileKeys(1000) {
 		tc := TileCount{Key: key, Count: rand.Uint64()}
-		got := TileCountFromBytes(tc.ToBytes()).(TileCount)
+		got, err := TileCountFromBytes(tc.ToBytes())
+		if err != nil {
+			t.Fatal(err)
+		}
 		if got.Key != tc.Key || got.Count != tc.Count {
 			t.Errorf("not round-trippable: %v, got %v", tc, got)
 		}
+	}
+}
+
+func TestTileCountFromBytesMalformed(t *testing.T) {
+	valid := TileCount{Key: MakeTileKey(7, 42, 23), Count: 98765}.ToBytes()
+	for _, b := range [][]byte{
+		nil,
+		{},
+		valid[:len(valid)-1],           // zoom byte missing
+		append(valid, 0),               // trailing garbage
+		bytes.Repeat([]byte{0xff}, 11), // varint overflow
+	} {
+		if got, err := TileCountFromBytes(b); err == nil {
+			t.Errorf("TileCountFromBytes(%v) = %v, want error", b, got)
+		}
+	}
+}
+
+func TestTileCountCompare(t *testing.T) {
+	a := TileCount{Key: MakeTileKey(7, 42, 23), Count: 5}
+	b := TileCount{Key: MakeTileKey(7, 42, 23), Count: 6}
+	c := TileCount{Key: MakeTileKey(7, 42, 24), Count: 1}
+	for _, tc := range []struct {
+		x, y TileCount
+		want int
+	}{
+		{a, a, 0}, {a, b, -1}, {b, a, 1}, {b, c, -1}, {c, b, 1},
+	} {
+		if got := TileCountCompare(tc.x, tc.y); got != tc.want {
+			t.Errorf("TileCountCompare(%v, %v) = %d, want %d", tc.x, tc.y, got, tc.want)
+		}
+		if got, want := TileCountLess(tc.x, tc.y), tc.want < 0; got != want {
+			t.Errorf("TileCountLess(%v, %v) = %v, want %v", tc.x, tc.y, got, want)
+		}
+	}
+}
+
+// TestExtsortTileCounts runs the external sort the way GetTileLogs does,
+// with chunks small enough to spill to disk and be merged, and checks the
+// result against an in-memory sort.
+func TestExtsortTileCounts(t *testing.T) {
+	keys := makeTestTileKeys(500)
+	input := make([]TileCount, 0, 5000)
+	for i := 0; i < cap(input); i++ {
+		// Few distinct keys and counts, so the input has many duplicates.
+		input = append(input, TileCount{Key: keys[rand.Intn(len(keys))], Count: uint64(rand.Intn(4))})
+	}
+
+	ch := make(chan TileCount)
+	config := extsort.DefaultConfig()
+	config.ChunkSize = 100
+	config.NumWorkers = 4
+	config.TempFilesDir = t.TempDir()
+	toBytes := func(c TileCount) ([]byte, error) { return c.ToBytes(), nil }
+	sorter, outChan, errChan := extsort.Generic(ch, TileCountFromBytes, toBytes, TileCountCompare, config)
+	go func() {
+		defer close(ch)
+		for _, c := range input {
+			ch <- c
+		}
+	}()
+	go sorter.Sort(context.Background())
+
+	var got []TileCount
+	for c := range outChan {
+		got = append(got, c)
+	}
+	if err := <-errChan; err != nil {
+		t.Fatal(err)
+	}
+
+	want := slices.Clone(input)
+	slices.SortFunc(want, TileCountCompare)
+	if !slices.Equal(got, want) {
+		t.Errorf("external sort differs from in-memory sort (got %d items, want %d)", len(got), len(want))
 	}
 }
 

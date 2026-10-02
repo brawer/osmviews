@@ -4,13 +4,13 @@
 package main
 
 import (
+	"cmp"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"math"
 	"math/bits"
 	"strconv"
-
-	"github.com/lanrat/extsort"
 )
 
 // TileLatitude returns the latitude of a web mercator tile’s northern edge,
@@ -168,29 +168,40 @@ func (c TileCount) ToBytes() []byte {
 	return buf[0:pos]
 }
 
-// TileCountFromBytes de-serializes a TileCount from a byte array.
-// The result is returned as an extsort.SortType because that is
-// needed by the library for external sorting.
-func TileCountFromBytes(b []byte) extsort.SortType { //nolint:staticcheck // deprecated extsort API, see #136
-	x, pos := binary.Uvarint(b)
-	y, len := binary.Uvarint(b[pos:])
-	pos += len
-	count, len := binary.Uvarint(b[pos:])
-	pos += len
+// errBadTileCount is returned by TileCountFromBytes for malformed input.
+var errBadTileCount = errors.New("malformed serialized TileCount")
+
+// TileCountFromBytes de-serializes a TileCount written by ToBytes.
+func TileCountFromBytes(b []byte) (TileCount, error) {
+	var vals [3]uint64 // x, y, count
+	pos := 0
+	for i := range vals {
+		v, n := binary.Uvarint(b[pos:])
+		if n <= 0 {
+			return TileCount{}, errBadTileCount
+		}
+		vals[i] = v
+		pos += n
+	}
+	if pos != len(b)-1 {
+		return TileCount{}, errBadTileCount
+	}
 	zoom := b[pos]
-	key := MakeTileKey(zoom, uint32(x), uint32(y))
-	return TileCount{Key: key, Count: count}
+	key := MakeTileKey(zoom, uint32(vals[0]), uint32(vals[1]))
+	return TileCount{Key: key, Count: vals[2]}, nil
+}
+
+// TileCountCompare orders TileCounts by key, then by count. It returns a
+// negative number if a sorts before b, a positive one if after, and zero
+// if they are equal.
+func TileCountCompare(a, b TileCount) int {
+	if c := cmp.Compare(a.Key, b.Key); c != 0 {
+		return c
+	}
+	return cmp.Compare(a.Count, b.Count)
 }
 
 // TileCountLess returns true if TileCount a should be sorted before b.
-// The arguments are passed as extsort.SortType because that is
-// needed by the library for external sorting.
-func TileCountLess(a, b extsort.SortType) bool { //nolint:staticcheck // deprecated extsort API, see #136
-	aa := a.(TileCount)
-	bb := b.(TileCount)
-	if aa.Key != bb.Key {
-		return aa.Key < bb.Key
-	} else {
-		return aa.Count < bb.Count
-	}
+func TileCountLess(a, b TileCount) bool {
+	return TileCountCompare(a, b) < 0
 }
