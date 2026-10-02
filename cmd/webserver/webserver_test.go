@@ -180,3 +180,27 @@ func TestWebserver_RobotsTxt(t *testing.T) {
 		t.Errorf("robots.txt = %q, want %q", got, want)
 	}
 }
+
+func TestWebserver_HomeRedirect(t *testing.T) {
+	for _, method := range []string{"GET", "HEAD"} {
+		status, header, _ := sendToHandler(testWebserver.HandleMain, method, "/")
+		if status != http.StatusMovedPermanently {
+			t.Errorf("%s /: status = %d, want 301", method, status)
+		}
+		if got := header.Get("Location"); got != "https://osmviews.brawer.ch/" {
+			t.Errorf("%s /: Location = %q, want https://osmviews.brawer.ch/", method, got)
+		}
+		if got := header.Get("Server"); got == "" {
+			t.Errorf("%s /: Server header not set", method)
+		}
+	}
+}
+
+func TestWebserver_UnknownPathNotFound(t *testing.T) {
+	for _, path := range []string{"/index.html", "/beta/", "/foo/bar"} {
+		status, _, _ := sendToHandler(testWebserver.HandleMain, "GET", path)
+		if status != http.StatusNotFound {
+			t.Errorf("GET %s: status = %d, want 404", path, status)
+		}
+	}
+}
