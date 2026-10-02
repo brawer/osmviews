@@ -13,6 +13,19 @@ Conventional Commit history. Versioning follows
 the **minor** version may be breaking — see
 [RELEASING.md](RELEASING.md#choosing-the-version-number).
 
+## [0.3.6](https://github.com/brawer/osmviews/compare/v0.3.5...v0.3.6) (2026-10-02)
+
+
+### 🆕 Features
+
+* **webserver:** count requests to the legacy /download/ URLs ([fbe57f9](https://github.com/brawer/osmviews/commit/fbe57f998381e0b2498a3c9c3a178a9fbe97de7b))
+* **webserver:** redirect / to the map at osmviews.brawer.ch ([7a6ab34](https://github.com/brawer/osmviews/commit/7a6ab34c7914301a036a88c1fa60b703ebbc18c4)), closes [#105](https://github.com/brawer/osmviews/issues/105)
+
+
+### 🐞 Fixes
+
+* **deps:** update all Go module dependencies ([9382a46](https://github.com/brawer/osmviews/commit/9382a469db595bb23f3e10dd088bc526401d94ee))
+
 ## [0.3.5](https://github.com/brawer/osmviews/compare/v0.3.4...v0.3.5) (2026-10-01)
 
 
