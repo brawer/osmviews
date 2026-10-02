@@ -9,6 +9,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/prometheus/client_golang/prometheus/testutil"
 )
 
 func sendRequest(method, path string, reqHeader http.Header) (status int, h http.Header, body []byte, err error) {
@@ -201,6 +203,32 @@ func TestWebserver_UnknownPathNotFound(t *testing.T) {
 		status, _, _ := sendToHandler(testWebserver.HandleMain, "GET", path)
 		if status != http.StatusNotFound {
 			t.Errorf("GET %s: status = %d, want 404", path, status)
+		}
+	}
+}
+
+func TestWebserver_DownloadRequestsCounted(t *testing.T) {
+	count := func(kind string) float64 {
+		return testutil.ToFloat64(downloadRequests.WithLabelValues(kind))
+	}
+	for _, tc := range []struct {
+		method, path, kind string
+		want               float64 // expected increase of the counter for kind
+	}{
+		{"GET", "/download/osmviews.tiff", "latest", 1},
+		{"HEAD", "/download/osmviews.tiff", "latest", 1},
+		{"GET", "/download/osmviews-20260830.cdx.json", "dated", 1},
+		{"GET", "/download/datapackage.json", "datapackage", 1},
+		{"GET", "/download/nonexistent", "unknown", 1},
+		{"OPTIONS", "/download/osmviews.tiff", "latest", 0}, // CORS pre-flight
+		{"DELETE", "/download/osmviews.tiff", "latest", 0},  // not allowed
+	} {
+		before := count(tc.kind)
+		if _, _, _, err := sendRequest(tc.method, tc.path, make(http.Header)); err != nil {
+			t.Fatal(err)
+		}
+		if got := count(tc.kind) - before; got != tc.want {
+			t.Errorf("%s %s: %q counter rose by %v, want %v", tc.method, tc.path, tc.kind, got, tc.want)
 		}
 	}
 }

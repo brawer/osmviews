@@ -16,7 +16,8 @@ import (
 	"time"
 
 	"github.com/brawer/osmviews/v2/internal/version"
-	//"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -88,6 +89,23 @@ func (ws *Webserver) HandleMain(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, homeURL, http.StatusMovedPermanently)
 }
 
+// downloadRequests counts GET and HEAD requests to the legacy /download/
+// URLs by kind, to see what still uses them before the "latest" redirect is
+// retired (issue #150). Exported at /metrics; the counts reset whenever the
+// webserver restarts, e.g. on every deploy.
+var downloadRequests = promauto.NewCounterVec(prometheus.CounterOpts{
+	Name: "osmviews_download_requests_total",
+	Help: "GET and HEAD requests to /download/, by kind: latest (osmviews.tiff), dated, datapackage, or unknown.",
+}, []string{"kind"})
+
+func init() {
+	// Export every kind from the start, so a zero shows as 0 rather than
+	// as a missing series.
+	for _, kind := range []string{"latest", "dated", "datapackage", "unknown"} {
+		downloadRequests.WithLabelValues(kind)
+	}
+}
+
 // HandleDownload redirects the legacy /download/ URLs to the CDN (issue #110).
 // This webserver holds no data of its own any more.
 //
@@ -123,6 +141,7 @@ func (ws *Webserver) HandleDownload(w http.ResponseWriter, req *http.Request) {
 	}
 
 	if name == "osmviews.tiff" {
+		downloadRequests.WithLabelValues("latest").Inc()
 		date, ok := ws.manifest.Date()
 		if !ok {
 			http.Error(w, "current version is not known yet", http.StatusServiceUnavailable)
@@ -135,11 +154,18 @@ func (ws *Webserver) HandleDownload(w http.ResponseWriter, req *http.Request) {
 
 	// name is fully validated before it reaches the Location header, so this
 	// can only ever redirect to a fixed-shape path under dataBaseURL.
-	if name == "datapackage.json" || datedObjectRegexp.MatchString(name) {
+	if name == "datapackage.json" {
+		downloadRequests.WithLabelValues("datapackage").Inc()
+		http.Redirect(w, req, dataBaseURL+"/"+name, http.StatusMovedPermanently)
+		return
+	}
+	if datedObjectRegexp.MatchString(name) {
+		downloadRequests.WithLabelValues("dated").Inc()
 		http.Redirect(w, req, dataBaseURL+"/"+name, http.StatusMovedPermanently)
 		return
 	}
 
+	downloadRequests.WithLabelValues("unknown").Inc()
 	http.NotFound(w, req)
 }
 
