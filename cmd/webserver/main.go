@@ -72,85 +72,20 @@ type Webserver struct {
 	manifest *Manifest
 }
 
+// homeURL is the OSMViews homepage: an interactive map of the current data,
+// maintained in github.com/brawer/osmviews-app.
+const homeURL = "https://osmviews.brawer.ch/"
+
+// HandleMain permanently redirects the root to homeURL. Because it is
+// registered for "/", it also receives every path that no other handler
+// claims; those are 404.
 func (ws *Webserver) HandleMain(w http.ResponseWriter, r *http.Request) {
-	h := w.Header()
-	h.Set("Server", ServerVersion)
-
-	fmt.Fprint(w, `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<link href='https://tools-static.wmflabs.org/fontcdn/css?family=Roboto+Slab:400,700' rel='stylesheet' type='text/css'/>
-<link href='https://tools-static.wmflabs.org/fontcdn/css?family=Source+Code+Pro:400' rel='stylesheet' type='text/css'/>
-<meta name='viewport' content='width=device-width, initial-scale=1.0'>
-<style>
-* {
-  box-sizing: border-box;
-  font-family: 'Roboto Slab', serif;
-}
-h1 {
-  margin-left: 1em;
-  margin-top: 1em;
-}
-.osm { color: #ff0088 }
-p { margin-left: 5em }
-pre.code {
-  margin-left: 9em;
-  white-space: pre;
-  font-family: 'Source Code Pro', monospace;
-}
-a:link { color: #ff77bb }
-a:hover { color: #ff48a5 }
-a:active { color: #ff0088 }
-a:visited { color: #ffaed7 }
-</style>
-</head>
-<body><h1><span class="osm">OSM</span>Views</h1>
-
-<p>World-wide ranking of geographic locations based on OpenStreetMap tile logs.
-<br/>Updated weekly. Aggregated over the past 52 weeks to smoothen seasonal effects.
-<br/>For any location on the planet, up to ~150m/z18 resolution.</p>
-
-<p><b>Use from Python:</b></p>
-
-<pre class="code"># pip install osmviews
-import osmviews
-
-# Fetch the GeoTIFF (~594 MB, updated weekly) from osmviews.DOWNLOAD_URL
-# to a local file, then look up locations by (longitude, latitude):
-with osmviews.open('osmviews.tiff') as o:
-    print(f'Tokyo, Shibuya:      {o.rank(139.7013,  35.6586):.2f}')
-    print(f'Zürich, Altstetten:  {o.rank(  8.4889,  47.3915):.2f}')
-    print(f'Ushuaia:             {o.rank(-68.3030, -54.8019):.2f}')
-    print(f'Sahara:              {o.rank( 13.0000,  23.0000):.2f}')
-
-Tokyo, Shibuya:      0.69
-Zürich, Altstetten:  0.66
-Ushuaia:             0.56
-Sahara:              0.00
-</pre>
-
-<p>Ranks range from 0.0 (never viewed) to 1.0 (most viewed). For
-high-throughput lookups, use the
-<a href="https://github.com/brawer/osmviews-rs">Rust client</a>, which is
-considerably faster than the Python one.</p>
-
-<p>
-<b>Author:</b> <a href="https://brawer.ch/">Sascha Brawer</a>
-<br/><b>Backend:</b>
-<a href="https://github.com/brawer/osmviews">github.com/brawer/osmviews</a>
-<br/><b>Clients:</b>
-<a href="https://github.com/brawer/osmviews-py">Python</a>,
-<a href="https://github.com/brawer/osmviews-rs">Rust</a>
-<br/><b>Download:</b> <a href="download/osmviews.tiff">Cloud-Optimized GeoTIFF</a>
-<br/><b>Provenance:</b> <a href="https://github.com/brawer/osmviews/blob/main/docs/downloads.md">bill of materials &amp; verification</a>
-<br/><b>License:</b> <a href="https://creativecommons.org/publicdomain/zero/1.0/">CC0-1.0</a> (data), <a href="https://en.wikipedia.org/wiki/MIT_License">MIT</a> (code)
-</p>
-
-<p><img src="https://mirrors.creativecommons.org/presskit/buttons/88x31/svg/cc-zero.svg"
-width="88" height="31" alt="Public Domain" style="float:left"/></p>
-
-</body></html>`)
+	w.Header().Set("Server", ServerVersion)
+	if r.URL.Path != "/" {
+		http.NotFound(w, r)
+		return
+	}
+	http.Redirect(w, r, homeURL, http.StatusMovedPermanently)
 }
 
 // HandleDownload redirects the legacy /download/ URLs to the CDN (issue #110).

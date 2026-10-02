@@ -9,9 +9,10 @@ The webserver handles requests for
 [osmviews.toolforge.org](https://osmviews.toolforge.org/).
 It runs on the Wikimedia Toolforge infrastructure behind a reverse proxy.
 
-It serves the landing page and redirects the legacy `/download/` URLs to the
-CDN, which serves the files the builder publishes (GeoTIFF, bill of materials,
-`datapackage.json`). `/download/osmviews.tiff` is a `302` to the current dated
+It redirects `/` to the OSMViews homepage at
+[osmviews.brawer.ch](https://osmviews.brawer.ch/), and the legacy `/download/`
+URLs to the CDN, which serves the files the builder publishes (GeoTIFF, bill of
+materials, `datapackage.json`). `/download/osmviews.tiff` is a `302` to the current dated
 object — the current version comes from polling `datapackage.json`; every other
 `/download/` path is a permanent `301`. The webserver keeps no local state. See
 [`docs/downloads.md`](../../docs/downloads.md) and
