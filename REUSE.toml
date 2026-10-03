@@ -18,3 +18,12 @@ precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 Sascha Brawer <sascha@brawer.ch>"
 SPDX-License-Identifier = "MIT"
 
+
+# Screenshot of the OSMViews map app (https://osmviews.brawer.ch). PNG cannot
+# carry an SPDX header comment. The handful of basemap labels it shows
+# (OpenFreeMap / OpenMapTiles, from OpenStreetMap data) are incidental.
+[[annotations]]
+path = "docs/osmviews.png"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Sascha Brawer <sascha@brawer.ch>"
+SPDX-License-Identifier = "CC0-1.0"

@@ -12,78 +12,35 @@ SPDX-License-Identifier: MIT
 [![Code: MIT](https://img.shields.io/badge/code-MIT-blue.svg)](LICENSE)
 [![Data: CC0-1.0](https://img.shields.io/badge/data-CC0--1.0-brightgreen.svg)](https://creativecommons.org/publicdomain/zero/1.0/)
 
-World-wide ranking of geographic locations based on OpenStreetMap tile logs.
-Updated weekly. Aggregated over the past 52 weeks to smoothen seasonal effects.
-For any location on the planet, up to ~150m/z18 resolution.
+**How much does the world look at a place?** OSMViews ranks every location
+on Earth by how often people view it on
+[OpenStreetMap](https://www.openstreetmap.org), down to ~150 m.
+Updated weekly, averaged over a year, free for any use.
 
-**See the current data on a map at <https://osmviews.brawer.ch>.**
+[![OSMViews map of Europe and Africa, with a magnifier showing Dublin at 0.731](docs/osmviews.png)](https://osmviews.brawer.ch)
 
-
-## Code repository
-
-* `cmd/webserver` is the [OSMViews webserver](https://osmviews.toolforge.org).
-* `cmd/osmviews-builder` is the pipeline that computes the data.
-* `docs` contains further [documentation](docs/).
-
-The [map web app](https://osmviews.brawer.ch) is maintained in
-[brawer/osmviews-app](https://github.com/brawer/osmviews-app).
-
-Client libraries are maintained in separate repositories:
-
-* Python: [brawer/osmviews-py](https://github.com/brawer/osmviews-py) [![PyPI](https://img.shields.io/pypi/v/osmviews?label=pypi)](https://pypi.org/project/osmviews/)
-* Rust: [brawer/osmviews-rs](https://github.com/brawer/osmviews-rs) [![crates.io](https://img.shields.io/crates/v/osmviews)](https://crates.io/crates/osmviews)
-
-Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
+**→ [Explore the map](https://osmviews.brawer.ch)**
 
 
-## Downloading the data
+## Use the data
 
-Start from **<https://osmviews.brawer.ch/data/datapackage.json>**, which names
-the current weekly build and its files: a Cloud-Optimized GeoTIFF and a
-[CycloneDX](https://cyclonedx.org) bill of materials, both addressed by date.
-The pixel-value histogram is embedded in the GeoTIFF.
-
-See [`docs/downloads.md`](docs/downloads.md) for the URLs, how to check for
-updates without re-downloading, the integrity digests, how to tie a download
-back to a specific version, and how to record which OSMViews build a downstream
-artifact was made from.
+* **Python:** `pip install osmviews` — [osmviews-py](https://github.com/brawer/osmviews-py)
+* **Rust:** `cargo add osmviews` — [osmviews-rs](https://github.com/brawer/osmviews-rs)
+* **Download:** a Cloud-Optimized GeoTIFF, listed in
+  [datapackage.json](https://osmviews.brawer.ch/data/datapackage.json) —
+  see [docs/downloads.md](docs/downloads.md)
 
 
-## How it works — and prior art
+## Learn more
 
-The techniques used by `cmd/osmviews-builder` — and by the
-[`osmviews-rs`](https://github.com/brawer/osmviews-rs) and
-[`osmviews-py`](https://github.com/brawer/osmviews-py) client libraries — are
-written up as a **defensive publication**. It doubles as a high-level tour of
-the whole system: the level-embedding tile key, the streaming per-period sort
-and cross-period merge, the constant-memory raster construction with inline
-overviews, and the Cloud-Optimized GeoTIFF layout.
-
-> Brawer, Sascha. *Method for Memory-Bounded Construction of a Globally
-> Complete, High-Zoom-Level Cloud-Optimized GeoTIFF from Tile-Access Logs.*
-> Technical Disclosure Commons, 2026.
-> <https://www.tdcommons.org/dpubs_series/11589>
-
-**[Read on Technical Disclosure Commons](https://www.tdcommons.org/dpubs_series/11589)**
-&nbsp;·&nbsp;
-[PDF](https://raw.githubusercontent.com/brawer/osmviews/main/docs/defensive-publication/defensive-publication.pdf)
-&nbsp;·&nbsp;
-[LaTeX source and Makefile](https://github.com/brawer/osmviews/tree/main/docs/defensive-publication)
-
-It is published to establish prior art and keep these techniques free to use.
+* [How it works](https://www.tdcommons.org/dpubs_series/11589) — a
+  [defensive publication](docs/defensive-publication/) describing the pipeline
+* [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) ·
+  [Map app source](https://github.com/brawer/osmviews-app)
 
 
 ## License
 
-Code: **MIT** — see [`LICENSE`](LICENSE).
-
-The defensive publication under
-[`docs/defensive-publication/`](docs/defensive-publication) is licensed
-**CC BY 4.0**.
-
-The OSMViews raster this pipeline produces is released into the public domain
-under **CC0 1.0**.
-
-This repository is [REUSE](https://reuse.software) compliant: every file
-declares its copyright and license, either in an SPDX header or via
-[`REUSE.toml`](REUSE.toml).
+Code: [MIT](LICENSE). Data and screenshot:
+[CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) (public domain).
+Docs: CC BY 4.0.
