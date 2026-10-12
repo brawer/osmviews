@@ -74,7 +74,7 @@ curl -sI https://osmviews.toolforge.org/ | grep -i '^server:'
 ssh login.toolforge.org
 become osmviews
 kubectl logs deployment/webserver | grep 'built with'
-# → OSMViews/vX.Y.Z+<commit>, built with go1.27.1, listening …
+# → OSMViews/vX.Y.Z+<commit>, built with go1.27.2, listening …
 
 # The latest published build (the query string bypasses a stale CDN copy,
 # see brawer/production#43):
