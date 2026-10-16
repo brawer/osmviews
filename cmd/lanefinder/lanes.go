@@ -202,7 +202,6 @@ func houghLanes(zoom uint8, tiles []Tile, p Params) []*Lane {
 			}
 		}
 	}
-	acc = nil
 	heap.Init(&cands)
 
 	idx := newPointIndex(pts, size)
