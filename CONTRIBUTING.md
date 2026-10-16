@@ -14,9 +14,10 @@ the web server (`cmd/webserver`) behind
 [osmviews.toolforge.org](https://osmviews.toolforge.org). The map with the
 current data is at [osmviews.brawer.ch](https://osmviews.brawer.ch); its code
 lives in [brawer/osmviews-app](https://github.com/brawer/osmviews-app). The
-Python and Rust client libraries live in
-[brawer/osmviews-py](https://github.com/brawer/osmviews-py) and
-[brawer/osmviews-rs](https://github.com/brawer/osmviews-rs).
+Python, Rust and Go client libraries live in
+[brawer/osmviews-py](https://github.com/brawer/osmviews-py),
+[brawer/osmviews-rs](https://github.com/brawer/osmviews-rs) and
+[brawer/osmviews-go](https://github.com/brawer/osmviews-go).
 
 ## Getting set up 🛠️
 

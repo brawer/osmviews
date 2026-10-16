@@ -33,4 +33,5 @@ warranty.
 This policy covers the code in this repository. The client libraries have their
 own policies:
 [Python](https://github.com/brawer/osmviews-py/security/policy),
-[Rust](https://github.com/brawer/osmviews-rs/security/policy).
+[Rust](https://github.com/brawer/osmviews-rs/security/policy),
+[Go](https://github.com/brawer/osmviews-go/security/policy).
