@@ -26,6 +26,7 @@ Updated weekly, averaged over a year, free for any use.
 
 * **Python:** `pip install osmviews` — [osmviews-py](https://github.com/brawer/osmviews-py)
 * **Rust:** `cargo add osmviews` — [osmviews-rs](https://github.com/brawer/osmviews-rs)
+* **Go:** `go get github.com/brawer/osmviews-go` — [osmviews-go](https://github.com/brawer/osmviews-go)
 * **Download:** a Cloud-Optimized GeoTIFF, listed in
   [datapackage.json](https://osmviews.brawer.ch/data/datapackage.json) —
   see [docs/downloads.md](docs/downloads.md)
