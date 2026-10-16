@@ -33,6 +33,13 @@ jobs:
         with:
           persist-credentials: false
 
+      # Install the Go toolchain from go.mod up front, so that CodeQL's
+      # autobuild doesn't have to download it at build time.
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        if: matrix.language == 'go'
+        with:
+          go-version-file: go.mod
+
       - uses: github/codeql-action/init@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         with:
           languages: ${{ matrix.language }}
