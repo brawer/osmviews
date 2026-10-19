@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -173,7 +174,10 @@ type FakeStorageObject struct {
 	Info    ObjectInfo
 }
 
+// FakeStorage is an in-memory Storage. Like the real client, it is safe
+// for concurrent use: the zoom filter uploads weeks in parallel.
 type FakeStorage struct {
+	mu    sync.Mutex
 	Files map[string]*FakeStorageObject
 }
 
@@ -195,11 +199,15 @@ func (s *FakeStorage) PutFile(ctx context.Context, bucket string, remotepath str
 		ETag:        etag,
 	}
 
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.Files[remotepath] = &FakeStorageObject{content, info}
 	return nil
 }
 
 func (s *FakeStorage) Get(ctx context.Context, bucket, path string) (io.Reader, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	f, present := s.Files[path]
 	if !present {
 		return nil, fmt.Errorf("file not found: %s", path)
@@ -208,6 +216,8 @@ func (s *FakeStorage) Get(ctx context.Context, bucket, path string) (io.Reader, 
 }
 
 func (s *FakeStorage) List(ctx context.Context, bucket, prefix string) ([]ObjectInfo, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	result := make([]ObjectInfo, 0, len(s.Files))
 	for _, f := range s.Files {
 		result = append(result, f.Info)
@@ -216,11 +226,15 @@ func (s *FakeStorage) List(ctx context.Context, bucket, prefix string) ([]Object
 }
 
 func (s *FakeStorage) Remove(ctx context.Context, bucketName, path string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	delete(s.Files, path)
 	return nil
 }
 
 func (s *FakeStorage) Stat(ctx context.Context, bucket string, path string) (ObjectInfo, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if f, present := s.Files[path]; present {
 		return f.Info, nil
 	} else {
