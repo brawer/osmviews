@@ -71,6 +71,16 @@ func TestCleanup(t *testing.T) {
 		}
 	}
 
+	// Cached zoom filter corrections: 60 are kept, older filter versions first to go.
+	for week := 1; week <= 3; week++ {
+		put(internal, fmt.Sprintf("internal/osmviews-builder/zoomfilter-v1-2022-W%02d.br", week))
+	}
+	for year := 2021; year <= 2022; year++ {
+		for week := 1; week <= 30; week++ {
+			put(internal, fmt.Sprintf("internal/osmviews-builder/zoomfilter-v2-%d-W%02d-3d.br", year, week))
+		}
+	}
+
 	// Public bucket: 5 dated builds. Only the 3 most recent .tiff survive;
 	// every .cdx.json is kept forever (issue #110). Decoys must be left alone.
 	put(public, "data/osmviews-not-matching-pattern.txt")
@@ -78,6 +88,7 @@ func TestCleanup(t *testing.T) {
 	for _, date := range []string{"20211205", "20211212", "20211226", "20220102", "20220109"} {
 		put(public, fmt.Sprintf("data/osmviews-%s.tiff", date))
 		put(public, fmt.Sprintf("data/osmviews-%s.cdx.json", date))
+		put(public, fmt.Sprintf("data/experimental/osmviews-%s-filtered.tiff", date))
 	}
 
 	if err := Cleanup(internal, "internal-bucket", public, "public-bucket"); err != nil {
@@ -104,6 +115,11 @@ func TestCleanup(t *testing.T) {
 	for week := 1; week <= 40; week++ { // 2022-W01..W40
 		wantInternal = append(wantInternal, fmt.Sprintf("internal/osmviews-builder/tilelogs-2022-W%02d.br", week))
 	}
+	for year := 2021; year <= 2022; year++ {
+		for week := 1; week <= 30; week++ {
+			wantInternal = append(wantInternal, fmt.Sprintf("internal/osmviews-builder/zoomfilter-v2-%d-W%02d-3d.br", year, week))
+		}
+	}
 	assertKeys("internal", internal, wantInternal)
 
 	assertKeys("public", public, []string{
@@ -117,6 +133,9 @@ func TestCleanup(t *testing.T) {
 		"data/osmviews-20220102.tiff",
 		"data/osmviews-20220109.cdx.json",
 		"data/osmviews-20220109.tiff",
+		"data/experimental/osmviews-20211226-filtered.tiff",
+		"data/experimental/osmviews-20220102-filtered.tiff",
+		"data/experimental/osmviews-20220109-filtered.tiff",
 	})
 }
 

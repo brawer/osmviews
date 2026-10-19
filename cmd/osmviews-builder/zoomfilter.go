@@ -16,7 +16,9 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/andybalholm/brotli"
@@ -45,8 +47,11 @@ import (
 // of zoom-z tiles that are wide and compact are left alone, unless they are
 // stretched along a ray from Null Island, which is what a dot of a dotted
 // lane looks like (a map viewport that paused while panning).
+//
+// A second stage, the lane filter (lanefilter.go), then finds the lanes as
+// whole lines and cleans the traces this stage leaves along them.
 const (
-	zoomFilterVersion = 1 // bump when the algorithm changes; part of cache names
+	zoomFilterVersion = 2 // bump when the algorithm changes; part of cache names
 
 	zoomFilterMinZoom = 9  // lowest zoom that gets filtered
 	zoomFilterMaxZoom = 16 // highest zoom that gets filtered
@@ -63,7 +68,7 @@ const (
 
 	zoomFilterMinWidth  = 6.0  // compact groups at least this wide (in tiles) are kept
 	zoomFilterMaxAspect = 10.0 // ...and no longer than this many times their width
-	zoomFilterMinElong  = 1.6  // ...unless elongated by at least this much
+	zoomFilterMinElong  = 1.2  // ...unless elongated by at least this much
 	zoomFilterMaxRayDev = 12.0 // ...within this many degrees of the ray from Null Island
 )
 
@@ -147,12 +152,43 @@ type zfZoom struct {
 type zoomFilter struct {
 	stack []zfNode // stack[i] is the open tile at zoom i
 	zooms [zoomFilterMaxZoom + 1]zfZoom
+	seeds [zoomFilterMaxZoom + 1][]laneSeed // tiles this stage reduced, for the lane filter
 }
 
 // ComputeZoomFilter reads one week of tile logs, in the TileKey-sorted
 // "zoom/x/y count" format of the weekly log files, and returns the
-// corrections the zoom filter makes to them, sorted by TileKey.
+// corrections of the cross-zoom stage, sorted by TileKey.
 func ComputeZoomFilter(r io.Reader) ([]TileCorrection, ZoomFilterStats, error) {
+	corr, _, stats, err := computeCrossZoom(r)
+	return corr, stats, err
+}
+
+// FilterWeek runs both stages of the zoom filter over one week of tile
+// logs with numDays days of data. open is called twice, because the lane
+// filter needs a second pass over the logs.
+func FilterWeek(open func() (io.ReadCloser, error), numDays int) ([]TileCorrection, string, error) {
+	r, err := open()
+	if err != nil {
+		return nil, "", err
+	}
+	corr, seeds, zstats, err := computeCrossZoom(r)
+	r.Close()
+	if err != nil {
+		return nil, "", err
+	}
+	r, err = open()
+	if err != nil {
+		return nil, "", err
+	}
+	defer r.Close()
+	all, lstats, err := laneFilter(r, corr, seeds, numDays)
+	if err != nil {
+		return nil, "", err
+	}
+	return all, fmt.Sprintf("cross-zoom: %s; lanes: %s", zstats, lstats), nil
+}
+
+func computeCrossZoom(r io.Reader) ([]TileCorrection, [zoomFilterMaxZoom + 1][]laneSeed, ZoomFilterStats, error) {
 	f := &zoomFilter{stack: make([]zfNode, 0, maxZoom+1)}
 	scanner := bufio.NewScanner(r)
 	last := WorldTile
@@ -163,20 +199,20 @@ func ComputeZoomFilter(r io.Reader) ([]TileCorrection, ZoomFilterStats, error) {
 			continue
 		}
 		if !first && tc.Key < last {
-			return nil, ZoomFilterStats{}, fmt.Errorf("tile logs not sorted: %s after %s", tc.Key, last)
+			return nil, f.seeds, ZoomFilterStats{}, fmt.Errorf("tile logs not sorted: %s after %s", tc.Key, last)
 		}
 		first = false
 		last = tc.Key
 		f.add(tc)
 	}
 	if err := scanner.Err(); err != nil {
-		return nil, ZoomFilterStats{}, err
+		return nil, f.seeds, ZoomFilterStats{}, err
 	}
 	for len(f.stack) > 0 {
 		f.pop()
 	}
 	corr, stats := f.finish()
-	return corr, stats, nil
+	return corr, f.seeds, stats, nil
 }
 
 // add feeds one tile into the streaming pass. Tiles arrive in pre-order,
@@ -330,6 +366,7 @@ func (f *zoomFilter) finish() ([]TileCorrection, ZoomFilterStats) {
 				continue
 			}
 			st.Removed += uint64(t.count - newCount)
+			f.seeds[z] = append(f.seeds[z], laneSeed{x: t.x, y: t.y, removed: t.count - newCount})
 			corr = append(corr, TileCorrection{
 				Key:   MakeTileKey(uint8(z), t.x, t.y),
 				Count: uint64(newCount),
@@ -483,26 +520,63 @@ func zoomFilterCacheName(weekLogName string) string {
 	return fmt.Sprintf("zoomfilter-v%d-%s", zoomFilterVersion, strings.TrimPrefix(weekLogName, "tilelogs-"))
 }
 
-// openZoomFilters returns, for each of the weekly log files in workdir
-// named by weekLogNames, a reader for the zoom filter's corrections to it
-// (see mergeTileCounts). Corrections are cached in workdir, so each week
-// is analysed only once per filter version; missing ones are computed in
-// parallel.
-func openZoomFilters(workdir string, weekLogNames []string, ctx context.Context) ([]io.Reader, error) {
+// weekLogDays returns the number of days of logs in a weekly log file,
+// from its name (see weekLogName).
+func weekLogDays(weekLogName string) int {
+	name := strings.TrimSuffix(weekLogName, ".br")
+	if i := strings.LastIndex(name, "-"); i >= 0 && strings.HasSuffix(name, "d") {
+		if n, err := strconv.Atoi(name[i+1 : len(name)-1]); err == nil && n >= 1 && n <= 7 {
+			return n
+		}
+	}
+	return 7
+}
+
+// prepareZoomFilters makes sure the zoom filter's corrections for the
+// weekly log files in workdir named by weekLogNames are cached in workdir
+// (see ensureZoomFilter). Each week is analysed only once per filter
+// version: the corrections are also kept in object storage next to the
+// weekly logs, if storage is not nil, because the production workdir does
+// not survive from one run to the next. Missing ones are computed in
+// parallel, newest week first. With a positive budget, no new week is
+// started once the budget is used up; the result then tells whether every
+// week is ready, so that a first run with an empty cache can spread the
+// work over several daily runs.
+func prepareZoomFilters(workdir string, weekLogNames []string, storage Storage, bucket string, budget time.Duration, ctx context.Context) (bool, error) {
+	start := time.Now()
 	g, _ := errgroup.WithContext(ctx)
-	g.SetLimit(max(1, runtime.NumCPU()/2))
-	for _, name := range weekLogNames {
+	g.SetLimit(max(1, runtime.GOMAXPROCS(0)/2))
+	var mu sync.Mutex
+	complete := true
+	for _, name := range slices.Backward(weekLogNames) {
 		g.Go(func() error {
-			if err := ensureZoomFilter(workdir, name); err != nil {
+			if budget > 0 && time.Since(start) > budget {
+				if _, err := os.Stat(filepath.Join(workdir, zoomFilterCacheName(name))); err != nil {
+					mu.Lock()
+					complete = false
+					mu.Unlock()
+					return nil
+				}
+			}
+			if err := ensureZoomFilter(workdir, name, storage, bucket); err != nil {
 				return fmt.Errorf("zoom filter for %s: %w", name, err)
 			}
 			return nil
 		})
 	}
 	if err := g.Wait(); err != nil {
+		return false, err
+	}
+	return complete, nil
+}
+
+// openZoomFilters returns, for each of the weekly log files named by
+// weekLogNames, a reader for the zoom filter's corrections to it (see
+// mergeTileCounts), computing the missing ones first.
+func openZoomFilters(workdir string, weekLogNames []string, storage Storage, bucket string, ctx context.Context) ([]io.Reader, error) {
+	if _, err := prepareZoomFilters(workdir, weekLogNames, storage, bucket, 0, ctx); err != nil {
 		return nil, err
 	}
-
 	result := make([]io.Reader, 0, len(weekLogNames))
 	for _, name := range weekLogNames {
 		f, err := os.Open(filepath.Join(workdir, zoomFilterCacheName(name)))
@@ -514,22 +588,38 @@ func openZoomFilters(workdir string, weekLogNames []string, ctx context.Context)
 	return result, nil
 }
 
-// ensureZoomFilter computes the zoom filter's corrections for a weekly
-// log file in workdir, unless they are already cached there.
-func ensureZoomFilter(workdir, weekLogName string) error {
+// ensureZoomFilter makes sure the zoom filter's corrections for a weekly
+// log file are cached in workdir: already there, downloaded from object
+// storage, or computed (and then uploaded).
+func ensureZoomFilter(workdir, weekLogName string, storage Storage, bucket string) error {
 	logger := log.Default()
-	cachePath := filepath.Join(workdir, zoomFilterCacheName(weekLogName))
+	ctx := context.Background()
+	cacheName := zoomFilterCacheName(weekLogName)
+	cachePath := filepath.Join(workdir, cacheName)
 	if _, err := os.Stat(cachePath); err == nil {
 		return nil
 	}
-
-	f, err := os.Open(filepath.Join(workdir, weekLogName))
-	if err != nil {
-		return err
+	remotePath := "internal/osmviews-builder/" + cacheName
+	if storage != nil {
+		if _, err := storage.Stat(ctx, bucket, remotePath); err == nil {
+			logger.Printf("loading s3://%s/%s to %s", bucket, remotePath, cachePath)
+			return Download(storage, bucket, remotePath, cachePath)
+		}
 	}
-	defer f.Close()
+
+	logPath := filepath.Join(workdir, weekLogName)
+	open := func() (io.ReadCloser, error) {
+		f, err := os.Open(logPath)
+		if err != nil {
+			return nil, err
+		}
+		return struct {
+			io.Reader
+			io.Closer
+		}{brotli.NewReader(f), f}, nil
+	}
 	start := time.Now()
-	corr, stats, err := ComputeZoomFilter(brotli.NewReader(f))
+	corr, stats, err := FilterWeek(open, weekLogDays(weekLogName))
 	if err != nil {
 		return err
 	}
@@ -553,7 +643,15 @@ func ensureZoomFilter(workdir, weekLogName string) error {
 	if err := out.Close(); err != nil {
 		return err
 	}
-	return os.Rename(tmpPath, cachePath)
+	if err := os.Rename(tmpPath, cachePath); err != nil {
+		return err
+	}
+	if storage != nil {
+		if err := storage.PutFile(ctx, bucket, remotePath, cachePath, "application/x-brotli"); err != nil {
+			return fmt.Errorf("uploading s3://%s/%s: %w", bucket, remotePath, err)
+		}
+	}
+	return nil
 }
 
 // writeTileCorrections writes corrections as brotli-compressed

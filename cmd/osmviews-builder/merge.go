@@ -43,6 +43,32 @@ func mergeTileCounts(r []io.Reader, weights []float64, corrections []io.Reader, 
 	return nil
 }
 
+// tileCountPair is a merged tile count before and after corrections.
+type tileCountPair struct {
+	Key           TileKey
+	Raw, Filtered uint64
+}
+
+// mergeTileCountPairs is like mergeTileCounts, but sends every count both
+// before and after its corrections.
+func mergeTileCountPairs(r []io.Reader, weights []float64, corrections []io.Reader, out chan<- tileCountPair, ctx context.Context) error {
+	defer close(out)
+	if len(r) == 0 {
+		return nil
+	}
+	merger := NewTileCountMerger(r, weights, corrections)
+	for merger.Advance() {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+		tc := merger.TileCount()
+		out <- tileCountPair{Key: tc.Key, Raw: merger.RawCount(), Filtered: tc.Count}
+	}
+	return merger.Err()
+}
+
 type TileCountMerger struct {
 	heap   tileCountHeap
 	err    error
@@ -101,6 +127,14 @@ func (m *TileCountMerger) Err() error {
 	return m.err
 }
 
+// RawCount returns the count of the current TileCount before corrections.
+func (m *TileCountMerger) RawCount() uint64 {
+	if len(m.heap) > 0 {
+		return m.heap[0].raw
+	}
+	return 0
+}
+
 func (m *TileCountMerger) TileCount() TileCount {
 	n := len(m.heap)
 	if n > 0 {
@@ -111,7 +145,8 @@ func (m *TileCountMerger) TileCount() TileCount {
 }
 
 type tileCountStream struct {
-	tc          TileCount
+	tc          TileCount // with corrections applied
+	raw         uint64    // tc.Count without corrections
 	scanner     *bufio.Scanner
 	weight      float64
 	corrections *correctionStream // nil if there are no corrections
@@ -137,15 +172,21 @@ func (s *tileCountStream) scan() bool {
 		return false
 	}
 	s.tc = ParseTileCount(s.scanner.Text())
+	s.raw = s.weigh(s.tc.Count)
 	if s.corrections != nil {
 		if count, ok := s.corrections.lookup(s.tc.Key); ok {
 			s.tc.Count = count
 		}
 	}
-	if s.weight != 1.0 && s.tc.Count > 0 {
-		s.tc.Count = uint64(float64(s.tc.Count)*s.weight + 0.5)
-	}
+	s.tc.Count = s.weigh(s.tc.Count)
 	return true
+}
+
+func (s *tileCountStream) weigh(count uint64) uint64 {
+	if s.weight != 1.0 && count > 0 {
+		return uint64(float64(count)*s.weight + 0.5)
+	}
+	return count
 }
 
 type tileCountHeap []*tileCountStream

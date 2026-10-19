@@ -141,8 +141,20 @@ func Cleanup(internal Storage, internalBucket string, public Storage, publicBuck
 		`internal/osmviews-builder/tilelogs-\d{4}-W\d{2}(-\d+d)?\.br`, 60, internal); err != nil {
 		return err
 	}
+	// Cached zoom filter corrections (zoomfilter.go): a year of weeks, plus
+	// slack; files of an older filter version sort first and go first.
+	if err := cleanupPath(internalBucket,
+		"internal/osmviews-builder/zoomfilter-",
+		`internal/osmviews-builder/zoomfilter-v\d+-\d{4}-W\d{2}(-\d+d)?\.br`, 60, internal); err != nil {
+		return err
+	}
 	if err := cleanupPath(publicBucket,
 		"data/osmviews-", `data/osmviews-\d{8}\.tiff`, 3, public); err != nil {
+		return err
+	}
+	// The experimental filtered GeoTIFFs, outside the BOM and datapackage.json.
+	if err := cleanupPath(publicBucket,
+		"data/experimental/osmviews-", `data/experimental/osmviews-\d{8}-filtered\.tiff`, 3, public); err != nil {
 		return err
 	}
 	return nil
