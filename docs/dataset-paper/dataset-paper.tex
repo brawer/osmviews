@@ -260,18 +260,93 @@ and why the correlation is lower than one might expect.}
 \todo{A known lane from one week injected into another; share of the lane
 that survives, and real traffic removed elsewhere.}
 
-\subsection{Agreement with other data}
-\todo{Rank correlation at matched resolution with GHSL population, VIIRS
-night lights, OpenStreetMap node density, and Wikimedia Commons photo
-locations; regular vs.\ filtered.}
+\subsection{Agreement with other data}\label{sec:external}
+Where people look on maps should follow where people live and what they
+visit. We compare OSMViews with three independent measures: population in
+2025 from GHS-POP~\cite{ghsl}, night-light radiant flux in 2024 derived from
+VIIRS~\cite{viirs}, and the camera locations of photos on Wikimedia Commons.
+All are brought onto the pixels of the overview level with
+\resExternalLevel{} pixels across the world (about 10\,km at the equator).
+Gridded data is turned into a density per km\textsuperscript{2} and
+max-pooled onto these pixels, just like the overview levels of the
+GeoTIFF~(\S\ref{sec:construction}); photos are counted per pixel and divided
+by its area. Correlations are Spearman's, over the
+\resExternalLandKm{}\,km\textsuperscript{2} of land outside
+Antarctica~\cite{naturalearth}, with each pixel weighted by its ground area
+so that Web Mercator does not inflate high latitudes.
+
+OSMViews correlates with population at \resExternalGhsl{}, with night
+lights at \resExternalViirs{} and with photo locations at
+\resExternalCommons{} (Table~\ref{tab:external}). That is about as strong as
+population and night lights agree with each other
+(\resExternalGhslViirs{}), and stronger than either agrees with photo
+locations. By continent (Table~\ref{tab:continents}), agreement is highest
+in Europe and North America and lowest in Africa.
+\todo{Interpret: Africa is where most lanes run (\S\ref{sec:filter}); rerun
+with the filtered raster once production publishes it, and report regular
+vs.\ filtered side by side. Population counts residents, OSMViews also
+counts visitors (tourist regions, transport corridors).}
+
+\begin{table}[t]
+  \centering\small
+  \caption{Spearman's rank correlation between OSMViews and other data, over
+    land outside Antarctica, weighted by area. Population: GHS-POP,
+    2025~\cite{ghsl}; night lights: VIIRS radiant flux,
+    2024~\cite{viirs}; photos: camera locations on Wikimedia Commons.}
+  \label{tab:external}
+  \input{generated/external-matrix.tex}
+\end{table}
+
+\begin{table}[t]
+  \centering\small
+  \caption{Spearman's rank correlation of OSMViews with other data, by
+    continent.}
+  \label{tab:continents}
+  \input{generated/external-continents.tex}
+\end{table}
 
 \subsection{Downstream use}
-\todo{QRank: rank correlation for items with coordinates, lane items vs.\ a
-matched control set. OSMDiffs: whether OSMViews helps rank edit proposals.}
+QRank ranks Wikidata items by their page views across Wikimedia
+projects~\cite{qrank}. For the \resQrankItems{} items that have both a
+coordinate location and a QRank, we read OSMViews at the item's coordinates
+on the level with \resQrankLevel{} pixels across the world (about 600\,m at
+the equator). The coordinates come from the Wikidata database dumps. The
+rank correlation between QRank and OSMViews is \resQrankSpearman{}, and
+\resQrankWithViewsPct\,\% of the items lie on pixels with views.
+\todo{Interpret: QRank measures interest in a thing, OSMViews in a place, so
+a moderate correlation is expected. Once the filtered raster is published:
+items on lanes vs.\ a matched control set. OSMDiffs: whether OSMViews helps
+rank edit proposals, once the list of reviewed proposals is in.}
 
 \subsection{Stability and coverage}
-\todo{Week-to-week stability; coverage compared with internet use by
-country; effect of partial weeks.}
+Each release covers a trailing year of tile logs, so consecutive weekly
+releases share all but one week. Across the \resStabilityReleases{} latest
+releases, the area-weighted rank correlation between consecutive releases is
+at least \resStabilitySpearmanMin{}, and at least
+\resStabilityTopKeptPctMin\,\% of the top \resStabilityTopPct\,\% of pixels
+stay in the top \resStabilityTopPct\,\%.
+\todo{Stability of single weeks, which needs per-week rasters from the
+builder; effect of partial weeks.}
+
+\resCoverageInCountriesPct\,\% of all views fall on a country; the rest is
+mostly sea. Across the \resCoverageCountries{} countries with recent World
+Bank figures~\cite{wdi} (latest year since 2020, median
+\resCoverageMedianYear{}), a country's views correlate with its number of
+internet users at \resCoverageSpearman{} (Spearman).
+Table~\ref{tab:coverage} lists the countries with at least
+\resCoverageMinUsersMillions{} million internet users that have the most and
+fewest views per internet user, relative to the world.
+\todo{Interpret: OpenStreetMap's standard tiles are used little in China and
+much in Europe; the ratio also reflects how many map users rely on other
+tile providers.}
+
+\begin{table}[t]
+  \centering\small
+  \caption{Share of views divided by share of internet users, for countries
+    with the highest and lowest ratio.}
+  \label{tab:coverage}
+  \input{generated/coverage-countries.tex}
+\end{table}
 
 %========================================================================
 \section{Usage notes and limitations}\label{sec:usage}
@@ -297,6 +372,24 @@ paper. \todo{Archive inputs and outputs on Zenodo and cite the DOI.}
 \bibitem{density} M.~Ruthe (tyr\_asd), \enquote{OpenStreetMap node density
   map,} 2026. \url{https://www.openstreetmap.org/user/tyr_asd/diary/19549}
   \todo{Check author name and year.}
+\bibitem{ghsl} M.~Schiavina, S.~Freire, A.~Carioli, K.~MacManus,
+  \enquote{GHS-POP R2023A: GHS population grid multitemporal
+  (1975--2030),} European Commission, Joint Research Centre, 2023.
+  \url{https://doi.org/10.2905/2FF68A52-5B5B-4A22-8F40-C41DA8332CFE}
+  \todo{Check authors and DOI.}
+\bibitem{viirs} H.~Zeng, M.~Jia, C.~Zhao, \enquote{2012--2024 global
+  nighttime light annual radiant flux based on SNPP-VIIRS,} Zenodo, 2025.
+  \url{https://doi.org/10.5281/zenodo.17847442}. Derived from the annual
+  VIIRS night lights of the Earth Observation Group, Payne Institute.
+  \todo{Also cite Zeng et al.\ 2025, Remote Sensing of Environment,
+  doi:10.1016/j.rse.2024.114576, and Elvidge et al.\ for VNL.}
+\bibitem{naturalearth} Natural Earth, 1:10m Cultural Vectors, Admin 0 --
+  Countries, version 5.1.1. \url{https://www.naturalearthdata.com/}
+\bibitem{qrank} S.~Brawer, \enquote{QRank: ranking of Wikidata items,}
+  \url{https://qrank.toolforge.org/}
+\bibitem{wdi} World Bank, World Development Indicators: individuals using
+  the internet (IT.NET.USER.ZS) and total population (SP.POP.TOTL).
+  \url{https://data.worldbank.org/}
 \end{thebibliography}
 
 \end{document}

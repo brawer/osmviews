@@ -21,18 +21,23 @@ def sha256(path):
 
 
 def resolve(name, cache):
-    """Returns the local path of input `name`, downloading it if needed."""
+    """Returns the local path of input `name`, downloading it if needed.
+
+    Returns None for an optional input that is neither pinned nor given.
+    """
     with open(MANIFEST, "rb") as f:
         entry = tomllib.load(f)[name]
     override = os.environ.get(entry["env"], "")
     if override:
         return Path(override)
     if not entry["url"]:
+        if entry.get("optional"):
+            return None
         raise SystemExit(
             f"input {name!r} has no pinned url yet; "
             f"set {entry['env']} to a local file"
         )
-    path = Path(cache) / Path(entry["url"]).name
+    path = Path(cache) / entry.get("file", Path(entry["url"]).name)
     if not path.exists():
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_suffix(path.suffix + ".tmp")
