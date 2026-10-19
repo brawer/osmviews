@@ -55,7 +55,9 @@ const (
 	laneExtend      = 4.0  // beyond the seeds, follow hot stretches this many degrees apart
 	laneBusyPerDay  = 10.0 // leave stretches whose sides average more requests per tile and day
 
-	nullIslandRadius = 3.0 // drop tiles entirely within this many degrees of Null Island
+	nullIslandRadius = 3.0  // tiles entirely within this many degrees of Null Island
+	nullIslandRing   = 6.0  // ... are lowered to the background of the ring out to here
+	nullIslandTrim   = 0.05 // fraction of the ring's busiest positions left out of its background
 )
 
 // laneSeed is a tile that the cross-zoom stage reduced.
@@ -80,12 +82,13 @@ type laneTile struct {
 	count       float64 // current count, lowered by laneClean
 	orig        float64 // count after the cross-zoom stage
 	angle, dist float64 // bearing and distance from Null Island, lon/lat degrees
+	annulus     bool    // center lies in the background ring around Null Island
 }
 
 // LaneFilterStats summarises what the lane filter did to one week.
 type LaneFilterStats struct {
 	Zooms      []LaneFilterZoomStats
-	NullIsland uint64 // requests dropped around Null Island
+	NullIsland uint64 // requests removed around Null Island
 }
 
 type LaneFilterZoomStats struct {
@@ -105,7 +108,7 @@ func (s LaneFilterStats) String() string {
 		}
 		b.WriteString("; ")
 	}
-	fmt.Fprintf(&b, "Null Island: dropped %d", s.NullIsland)
+	fmt.Fprintf(&b, "Null Island: removed %d", s.NullIsland)
 	return b.String()
 }
 
@@ -362,6 +365,45 @@ func laneClean(zoom uint8, lines []laneLine, tiles []laneTile, numDays int) []la
 	return kept
 }
 
+// inNullIslandRing reports whether a tile's center lies in the ring
+// between nullIslandRadius and nullIslandRing degrees around Null Island.
+// Its mean count per tile is the background that replaces the counts
+// inside the circle.
+func inNullIslandRing(zoom uint8, x, y uint32) bool {
+	if zoom < 7 {
+		return false
+	}
+	lon, lat := tileLonLat(float64(uint64(1)<<zoom), float64(x)+0.5, float64(y)+0.5)
+	d := math.Hypot(lon, lat)
+	return d > nullIslandRadius && d <= nullIslandRing
+}
+
+// nullIslandRingTiles approximates the number of tile positions in the
+// ring; near the equator, a tile spans about 360/n degrees both ways.
+func nullIslandRingTiles(zoom uint8) float64 {
+	s := float64(uint64(1)<<zoom) / 360
+	return math.Pi * (nullIslandRing*nullIslandRing - nullIslandRadius*nullIslandRadius) * s * s
+}
+
+// nullIslandBackground returns the background count per tile in the ring
+// around Null Island, given the counts of the ring's tiles in the logs.
+// Positions without requests count as zero. The busiest nullIslandTrim of
+// positions are left out, so a city in the ring (Accra lies 5.6° from
+// Null Island) or the remains of a lane do not raise the background.
+func nullIslandBackground(zoom uint8, counts []float64) uint64 {
+	positions := nullIslandRingTiles(zoom)
+	trim := int(positions * nullIslandTrim)
+	if positions-float64(trim) < 1 {
+		return 0
+	}
+	slices.Sort(counts)
+	var sum float64
+	for _, c := range counts[:max(len(counts)-trim, 0)] {
+		sum += c
+	}
+	return uint64(math.Round(sum / (positions - float64(trim))))
+}
+
 // insideNullIsland reports whether a tile lies entirely within
 // nullIslandRadius degrees (lon/lat) of Null Island.
 func insideNullIsland(zoom uint8, x, y uint32) bool {
@@ -392,6 +434,7 @@ func laneFilter(r io.Reader, corr []TileCorrection, seeds [laneMaxZoom + 1][]lan
 
 	var near [laneMaxZoom + 1][]laneTile
 	var island []TileCorrection
+	var ring [maxZoom + 1][]float64 // counts of the tiles in the ring around Null Island
 	scanner := bufio.NewScanner(r)
 	ci := 0 // next correction to look at; corr and the logs are both in TileKey order
 	for scanner.Scan() {
@@ -408,18 +451,21 @@ func laneFilter(r io.Reader, corr []TileCorrection, seeds [laneMaxZoom + 1][]lan
 		}
 		zoom, x, y := tc.Key.ZoomXY()
 		if insideNullIsland(zoom, x, y) {
-			if tc.Count > 0 {
-				island = append(island, TileCorrection{Key: tc.Key, Count: 0})
-				stats.NullIsland += uint64(count)
+			if count > 0 {
+				island = append(island, TileCorrection{Key: tc.Key, Count: uint64(count)})
 			}
 			continue
 		}
+		inRing := inNullIslandRing(zoom, x, y)
 		z := int(zoom)
-		if z < laneMinZoom || z > laneMaxZoom || len(lines[z]) == 0 {
-			continue
+		if z >= laneMinZoom && z <= laneMaxZoom && len(lines[z]) > 0 {
+			if ok, angle, dist := laneNear(float64(uint64(1)<<zoom), x, y, lines[z]); ok {
+				near[z] = append(near[z], laneTile{x: x, y: y, count: count, orig: count, angle: angle, dist: dist, annulus: inRing})
+				continue // added to the ring sum after cleaning
+			}
 		}
-		if ok, angle, dist := laneNear(float64(uint64(1)<<zoom), x, y, lines[z]); ok {
-			near[z] = append(near[z], laneTile{x: x, y: y, count: count, orig: count, angle: angle, dist: dist})
+		if inRing {
+			ring[zoom] = append(ring[zoom], count)
 		}
 	}
 	if err := scanner.Err(); err != nil {
@@ -433,6 +479,9 @@ func laneFilter(r io.Reader, corr []TileCorrection, seeds [laneMaxZoom + 1][]lan
 			st.Lines = laneClean(uint8(z), lines[z], near[z], numDays)
 		}
 		for _, t := range near[z] {
+			if t.annulus {
+				ring[z] = append(ring[z], t.count)
+			}
 			if t.count < t.orig {
 				st.Removed += uint64(t.orig - t.count)
 				laneCorr = append(laneCorr, TileCorrection{
@@ -443,6 +492,23 @@ func laneFilter(r io.Reader, corr []TileCorrection, seeds [laneMaxZoom + 1][]lan
 		}
 		stats.Zooms = append(stats.Zooms, st)
 	}
+
+	// Inside the circle, lower each tile to the ring's background.
+	var bgs [maxZoom + 1]uint64
+	for z := range ring {
+		bgs[z] = nullIslandBackground(uint8(z), ring[z])
+	}
+	j := 0
+	for _, tc := range island {
+		bg := bgs[tc.Key.Zoom()]
+		if bg >= tc.Count {
+			continue
+		}
+		stats.NullIsland += tc.Count - bg
+		island[j] = TileCorrection{Key: tc.Key, Count: bg}
+		j++
+	}
+	island = island[:j]
 
 	// Combine: Null Island first, then the lane filter, then the cross-zoom stage.
 	all := make([]TileCorrection, 0, len(corr)+len(laneCorr)+len(island))

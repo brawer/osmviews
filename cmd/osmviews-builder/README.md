@@ -29,7 +29,10 @@ Island itself when they start. The zoom filter removes both, in three steps:
    through Null Island, and cleans the faint traces the first step leaves
    along them, except where they cross busy areas
    ([`lanefilter.go`](lanefilter.go)).
-3. Tiles entirely within 3° of Null Island, which is open sea, are dropped.
+3. Tiles entirely within 3° of Null Island, which is open sea, are lowered
+   to the background of the ring between 3° and 6°: its mean request count
+   per tile, leaving out the busiest 5% of tiles (Accra lies in the ring).
+   The map shows ordinary sea there instead of a hole.
 
 After the regular GeoTIFF of a week is published, a later run paints a
 second GeoTIFF with the filter applied and uploads it to

@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"math"
 	"os"
@@ -193,6 +194,17 @@ func TestFilterWeek(t *testing.T) {
 		x, y := lonLatTile(zoom, 0.1, 0.1)
 		w.add(zoom, x, y, 1000)
 	}
+	// Background in the ring around Null Island at zoom 8: 100 per tile,
+	// plus a city that the trimmed mean leaves out.
+	for x := uint32(110); x < 146; x++ {
+		for y := uint32(110); y < 146; y++ {
+			if inNullIslandRing(8, x, y) {
+				w.add(8, x, y, 100)
+			}
+		}
+	}
+	cx, cy := lonLatTile(8, -0.2, 5.6)
+	w.add(8, cx, cy, 100000)
 
 	data := w.reader().(*strings.Reader)
 	text, _ := io.ReadAll(data)
@@ -225,7 +237,12 @@ func TestFilterWeek(t *testing.T) {
 	}
 	for zoom := uint8(8); zoom <= 14; zoom++ {
 		x, y := lonLatTile(zoom, 0.1, 0.1)
-		if c, ok := got[MakeTileKey(zoom, x, y)]; !ok || c != 0 {
+		c, ok := got[MakeTileKey(zoom, x, y)]
+		// Zoom 8 tiles are coarse, so fewer tile centers fall in the
+		// ring than its area suggests.
+		if zoom == 8 && (!ok || c < 70 || c > 110) {
+			t.Errorf("Null Island tile at zoom 8: got %d, %v; want about 100", c, ok)
+		} else if zoom > 8 && (!ok || c != 0) {
 			t.Errorf("Null Island tile at zoom %d: got %d, %v; want 0", zoom, c, ok)
 		}
 	}
@@ -235,7 +252,8 @@ func TestFilterWeek(t *testing.T) {
 			t.Errorf("unexpected correction for %s", k)
 		}
 	}
-	if !strings.Contains(stats, "Null Island: dropped 7000") {
+	x8, y8 := lonLatTile(8, 0.1, 0.1)
+	if want := fmt.Sprintf("Null Island: removed %d", 7000-got[MakeTileKey(8, x8, y8)]); !strings.Contains(stats, want) {
 		t.Errorf("stats = %q", stats)
 	}
 }
@@ -347,5 +365,40 @@ func TestPaint_FilteredOutput(t *testing.T) {
 	}
 	if !slices.Equal(a, c) {
 		t.Error("plain output changed by painting a filtered one alongside")
+	}
+}
+
+func TestNullIslandRingTiles(t *testing.T) {
+	for _, zoom := range []uint8{9, 11, 13} {
+		n := uint32(1) << zoom
+		lo, hi := n/2-n/40, n/2+n/40
+		count := 0
+		for x := lo; x < hi; x++ {
+			for y := lo; y < hi; y++ {
+				if inNullIslandRing(zoom, x, y) {
+					count++
+				}
+			}
+		}
+		want := nullIslandRingTiles(zoom)
+		if math.Abs(float64(count)-want) > 0.05*want {
+			t.Errorf("zoom %d: %d tiles in ring, estimate %.1f", zoom, count, want)
+		}
+	}
+}
+
+func TestNullIslandBackground(t *testing.T) {
+	// Zoom 10 has about 686 positions in the ring. The 34 busiest are
+	// left out: the two outliers and 32 ordinary ones, so the background
+	// is 268 * 13 / 652.
+	counts := []float64{1e6, 5e5}
+	for range 300 {
+		counts = append(counts, 13)
+	}
+	if got := nullIslandBackground(10, counts); got != 5 {
+		t.Errorf("got %d, want 5", got)
+	}
+	if got := nullIslandBackground(10, nil); got != 0 {
+		t.Errorf("empty ring: got %d, want 0", got)
 	}
 }
