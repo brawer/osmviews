@@ -1,0 +1,20 @@
+# SPDX-FileCopyrightText: 2026 Sascha Brawer <sascha@brawer.ch>
+# SPDX-License-Identifier: MIT
+#
+# Every input of the evaluation, pinned by URL and SHA-256. `make` downloads
+# each one once into the cache directory and refuses a file whose checksum
+# does not match. An input whose url is still empty must be given as a local
+# file through the environment variable named in `env`, which also overrides
+# a pinned url for experiments.
+
+[osmviews]
+description = "Regular OSMViews GeoTIFF of the evaluated release"
+url = ""     # set once the release is published
+sha256 = ""
+env = "OSMVIEWS_TIFF"
+
+[osmviews-filtered]
+description = "Experimental OSMViews GeoTIFF with zoom filter v2 (lanes, Null Island)"
+url = ""     # data/experimental/osmviews-<date>-filtered.tiff of the same release
+sha256 = ""
+env = "OSMVIEWS_FILTERED_TIFF"
