@@ -139,7 +139,7 @@ func TestBOM_MatchesPaintedFile(t *testing.T) {
 	paths := [2]string{filepath.Join(dir, "a.tif"), filepath.Join(dir, "b.tif")}
 	var digests [2]string
 	for i, p := range paths {
-		if err := paint(p, 11, []io.Reader{strings.NewReader("3/1/1 3\n")}, nil, meta, context.Background()); err != nil {
+		if err := paint(p, 11, []io.Reader{strings.NewReader("3/1/1 3\n")}, nil, nil, meta, context.Background()); err != nil {
 			t.Fatal(err)
 		}
 		sha256hex, _, err := hashFile(p)

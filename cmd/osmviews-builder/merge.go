@@ -13,14 +13,17 @@ import (
 // mergeTileCounts merges the per-week, TileKey-sorted readers in r into a
 // single TileKey-sorted stream on out. weights[i] scales the impression
 // counts of r[i] (used to extrapolate weeks with missing days to a full
-// week); a nil or short weights slice means a factor of 1.0.
-func mergeTileCounts(r []io.Reader, weights []float64, out chan<- TileCount, ctx context.Context) error {
+// week); a nil or short weights slice means a factor of 1.0. corrections[i],
+// if present and not nil, holds TileKey-sorted "zoom/x/y count" lines whose
+// counts replace those of the same tiles in r[i] before weighting (see
+// ComputeZoomFilter).
+func mergeTileCounts(r []io.Reader, weights []float64, corrections []io.Reader, out chan<- TileCount, ctx context.Context) error {
 	defer close(out)
 	if len(r) == 0 {
 		return nil
 	}
 
-	merger := NewTileCountMerger(r, weights)
+	merger := NewTileCountMerger(r, weights, corrections)
 	for merger.Advance() {
 		// Check if our task has been canceled. Typically this can happen
 		// because of an error in another goroutine in the same x.sync.errroup.
@@ -46,7 +49,7 @@ type TileCountMerger struct {
 	inited bool
 }
 
-func NewTileCountMerger(r []io.Reader, weights []float64) *TileCountMerger {
+func NewTileCountMerger(r []io.Reader, weights []float64, corrections []io.Reader) *TileCountMerger {
 	m := &TileCountMerger{}
 	m.heap = make(tileCountHeap, 0, len(r))
 	for i, rr := range r {
@@ -55,10 +58,13 @@ func NewTileCountMerger(r []io.Reader, weights []float64) *TileCountMerger {
 			weight = weights[i]
 		}
 		stream := &tileCountStream{scanner: bufio.NewScanner(rr), weight: weight}
+		if i < len(corrections) && corrections[i] != nil {
+			stream.corrections = newCorrectionStream(corrections[i])
+		}
 		if stream.scan() {
 			m.heap = append(m.heap, stream)
 		}
-		if err := stream.scanner.Err(); err != nil {
+		if err := stream.Err(); err != nil {
 			m.err = err
 			return m
 		}
@@ -84,7 +90,7 @@ func (m *TileCountMerger) Advance() bool {
 	} else {
 		heap.Remove(&m.heap, 0)
 	}
-	if err := stream.scanner.Err(); err != nil {
+	if err := stream.Err(); err != nil {
 		m.err = err
 		return false
 	}
@@ -105,19 +111,37 @@ func (m *TileCountMerger) TileCount() TileCount {
 }
 
 type tileCountStream struct {
-	tc      TileCount
-	scanner *bufio.Scanner
-	weight  float64
-	index   int
+	tc          TileCount
+	scanner     *bufio.Scanner
+	weight      float64
+	corrections *correctionStream // nil if there are no corrections
+	index       int
 }
 
-// scan reads the next record from the stream into s.tc, scaling its
-// impression count by s.weight. It returns false at end of input.
+// Err returns the first error from reading the stream or its corrections.
+func (s *tileCountStream) Err() error {
+	if err := s.scanner.Err(); err != nil {
+		return err
+	}
+	if s.corrections != nil {
+		return s.corrections.err
+	}
+	return nil
+}
+
+// scan reads the next record from the stream into s.tc, applying any
+// correction for its tile and scaling its impression count by s.weight.
+// It returns false at end of input.
 func (s *tileCountStream) scan() bool {
 	if !s.scanner.Scan() {
 		return false
 	}
 	s.tc = ParseTileCount(s.scanner.Text())
+	if s.corrections != nil {
+		if count, ok := s.corrections.lookup(s.tc.Key); ok {
+			s.tc.Count = count
+		}
+	}
 	if s.weight != 1.0 && s.tc.Count > 0 {
 		s.tc.Count = uint64(float64(s.tc.Count)*s.weight + 0.5)
 	}
