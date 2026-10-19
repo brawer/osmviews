@@ -94,14 +94,14 @@ func main() {
 	filteredMeta := TiffMetadata{
 		Description: fmt.Sprintf(
 			"EXPERIMENTAL, zoom filter v%d against tile-log lanes. OpenStreetMap view density: "+
-				"ln(1 + weekly user views per km2) per pixel. Tile logs %s..%s. https://osmviews.toolforge.org",
+				"ln(1 + weekly user views per km2) per pixel. Tile logs %s..%s. https://osmviews.brawer.ch",
 			zoomFilterVersion, logs.firstDay.Format("2006-01-02"), logs.lastDay.Format("2006-01-02")),
 		DateTime: logs.lastDay,
 	}
 	meta := TiffMetadata{
 		Description: fmt.Sprintf(
 			"OpenStreetMap view density: ln(1 + weekly user views per km2) "+
-				"per pixel. Tile logs %s..%s. https://osmviews.toolforge.org",
+				"per pixel. Tile logs %s..%s. https://osmviews.brawer.ch",
 			logs.firstDay.Format("2006-01-02"), logs.lastDay.Format("2006-01-02")),
 		DateTime: logs.lastDay,
 	}
