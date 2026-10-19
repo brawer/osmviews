@@ -13,6 +13,14 @@ Conventional Commit history. Versioning follows
 the **minor** version may be breaking — see
 [RELEASING.md](RELEASING.md#choosing-the-version-number).
 
+## [0.3.8](https://github.com/brawer/osmviews/compare/v0.3.7...v0.3.8) (2026-10-19)
+
+
+### 🆕 Features
+
+* **builder:** experimental zoom filter against tile-log lanes ([2e8162f](https://github.com/brawer/osmviews/commit/2e8162f6a3934f8ac7cf90623a446840495ae459))
+* **builder:** publish an experimental filtered GeoTIFF ([#162](https://github.com/brawer/osmviews/issues/162)) ([7ff0a1e](https://github.com/brawer/osmviews/commit/7ff0a1ef33d932d68ffd10deb7e73615028c3c78))
+
 ## [0.3.7](https://github.com/brawer/osmviews/compare/v0.3.6...v0.3.7) (2026-10-12)
 
 
