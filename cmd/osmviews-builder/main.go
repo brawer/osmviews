@@ -90,7 +90,7 @@ func main() {
 	remoteBomPath := fmt.Sprintf("data/osmviews-%s.cdx.json", date)
 
 	filteredPath := filepath.Join(*workdir, fmt.Sprintf("osmviews-%s-filtered.tiff", date))
-	remoteFilteredPath := fmt.Sprintf("experimental/osmviews-%s-filtered.tiff", date)
+	remoteFilteredPath := fmt.Sprintf("data/experimental/osmviews-%s-filtered.tiff", date)
 	filteredMeta := TiffMetadata{
 		Description: fmt.Sprintf(
 			"EXPERIMENTAL, zoom filter v%d against tile-log lanes. OpenStreetMap view density: "+

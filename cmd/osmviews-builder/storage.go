@@ -154,7 +154,7 @@ func Cleanup(internal Storage, internalBucket string, public Storage, publicBuck
 	}
 	// The experimental filtered GeoTIFFs, outside the BOM and datapackage.json.
 	if err := cleanupPath(publicBucket,
-		"experimental/osmviews-", `experimental/osmviews-\d{8}-filtered\.tiff`, 3, public); err != nil {
+		"data/experimental/osmviews-", `data/experimental/osmviews-\d{8}-filtered\.tiff`, 3, public); err != nil {
 		return err
 	}
 	return nil

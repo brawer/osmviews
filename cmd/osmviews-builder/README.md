@@ -36,7 +36,8 @@ Island itself when they start. The zoom filter removes both, in three steps:
 
 After the regular GeoTIFF of a week is published, a later run paints a
 second GeoTIFF with the filter applied and uploads it to
-`experimental/osmviews-<date>-filtered.tiff` in the public bucket. It is
+`data/experimental/osmviews-<date>-filtered.tiff` in the public bucket,
+so it can be downloaded from the CDN like the regular files. It is
 not listed in the BOM or `datapackage.json` until it has been evaluated.
 Painting takes about as long for either GeoTIFF, so they are painted in
 separate runs to stay within the job's time limit; the job runs daily, and

@@ -88,7 +88,7 @@ func TestCleanup(t *testing.T) {
 	for _, date := range []string{"20211205", "20211212", "20211226", "20220102", "20220109"} {
 		put(public, fmt.Sprintf("data/osmviews-%s.tiff", date))
 		put(public, fmt.Sprintf("data/osmviews-%s.cdx.json", date))
-		put(public, fmt.Sprintf("experimental/osmviews-%s-filtered.tiff", date))
+		put(public, fmt.Sprintf("data/experimental/osmviews-%s-filtered.tiff", date))
 	}
 
 	if err := Cleanup(internal, "internal-bucket", public, "public-bucket"); err != nil {
@@ -133,9 +133,9 @@ func TestCleanup(t *testing.T) {
 		"data/osmviews-20220102.tiff",
 		"data/osmviews-20220109.cdx.json",
 		"data/osmviews-20220109.tiff",
-		"experimental/osmviews-20211226-filtered.tiff",
-		"experimental/osmviews-20220102-filtered.tiff",
-		"experimental/osmviews-20220109-filtered.tiff",
+		"data/experimental/osmviews-20211226-filtered.tiff",
+		"data/experimental/osmviews-20220102-filtered.tiff",
+		"data/experimental/osmviews-20220109-filtered.tiff",
 	})
 }
 
