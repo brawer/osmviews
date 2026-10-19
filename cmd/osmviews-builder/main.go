@@ -139,29 +139,34 @@ func main() {
 		logger.Printf("already published: %s/%s and siblings; nothing to do", pubBucket, remotepath)
 		return
 	}
+	if !published {
+		logger.Printf("painting the regular GeoTIFF; the filtered one follows in a later run")
+	}
 
 	// The experimental zoom filter (zoomfilter.go) yields a second GeoTIFF,
 	// published outside the BOM and datapackage.json until it has been
-	// evaluated. Its corrections are cached per week in object storage. On
-	// a first run, computing them for a whole year would not fit into the
-	// job's time limit, so each run works on them for a limited time, and
-	// the filtered GeoTIFF is painted once all weeks are ready. Since the
-	// filter is experimental, its failures do not stop the regular output.
+	// evaluated. Painting it takes about as long as the regular GeoTIFF, so
+	// it is painted in a later run than the regular one, to stay within the
+	// job's time limit; the job runs daily but a new week comes only weekly.
+	// The filter's corrections are cached per week in object storage. On a
+	// first run, computing them for a whole year would not fit into the time
+	// limit either, so each run works on them for a limited time, and the
+	// filtered GeoTIFF is painted once all weeks are ready. Since the filter
+	// is experimental, its failures do not stop the regular output.
 	paintFiltered := false
-	if !filteredPublished {
+	if published {
 		ready, err := prepareZoomFilters(*workdir, logs.names, storage, bucket, 40*time.Minute, ctx)
 		switch {
 		case err != nil:
-			logger.Printf("zoom filter failed, painting without it: %v", err)
+			logger.Printf("zoom filter failed: %v", err)
 		case !ready:
 			logger.Printf("zoom filter not ready for all weeks yet; continuing on the next run")
 		default:
 			paintFiltered = true
 		}
-	}
-	if published && !paintFiltered {
-		logger.Printf("already published: %s/%s and siblings; nothing to do", pubBucket, remotepath)
-		return
+		if !paintFiltered {
+			return
+		}
 	}
 
 	// Paint the output GeoTIFF files. The description deliberately carries no
@@ -175,15 +180,10 @@ func main() {
 	if paintFiltered {
 		corrections, err = openZoomFilters(*workdir, logs.names, storage, bucket, ctx)
 		if err != nil {
-			logger.Printf("zoom filter failed, painting without it: %v", err)
-			paintFiltered = false
-		} else {
-			outputs = append(outputs, PaintOutput{Path: filteredPath, Meta: filteredMeta, Filtered: true})
+			logger.Printf("zoom filter failed: %v", err)
+			return
 		}
-	}
-	if len(outputs) == 0 {
-		logger.Printf("already published: %s/%s and siblings; nothing to do", pubBucket, remotepath)
-		return
+		outputs = append(outputs, PaintOutput{Path: filteredPath, Meta: filteredMeta, Filtered: true})
 	}
 	if err := paint(outputs, maxZoom, logs.readers, logs.weights, corrections, ctx); err != nil {
 		logger.Fatalf("painting: %v", err)

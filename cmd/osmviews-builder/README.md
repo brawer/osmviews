@@ -31,10 +31,13 @@ Island itself when they start. The zoom filter removes both, in three steps:
    ([`lanefilter.go`](lanefilter.go)).
 3. Tiles entirely within 3° of Null Island, which is open sea, are dropped.
 
-Every run paints a second GeoTIFF with the filter applied and uploads it
-to `experimental/osmviews-<date>-filtered.tiff` in the public bucket. It is
+After the regular GeoTIFF of a week is published, a later run paints a
+second GeoTIFF with the filter applied and uploads it to
+`experimental/osmviews-<date>-filtered.tiff` in the public bucket. It is
 not listed in the BOM or `datapackage.json` until it has been evaluated.
-Both GeoTIFFs are painted in the same pass over the tile logs.
+Painting takes about as long for either GeoTIFF, so they are painted in
+separate runs to stay within the job's time limit; the job runs daily, and
+a new week of logs arrives only weekly.
 
 Each week's corrections are cached as `zoomfilter-v<N>-<week>.br`, in the
 workdir and in the internal bucket next to the weekly tile logs. A run
@@ -44,5 +47,5 @@ the work over several daily runs. Failures of the filter are logged and do
 not stop the regular output.
 
 With `-zoom-filter`, the builder paints both GeoTIFFs into the workdir,
-`osmviews-<date>.tiff` and `osmviews-<date>-filtered.tiff`, and exits
-without publishing anything.
+`osmviews-<date>.tiff` and `osmviews-<date>-filtered.tiff`, in one pass
+over the tile logs, and exits without publishing anything.
