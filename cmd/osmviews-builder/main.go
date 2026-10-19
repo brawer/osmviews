@@ -30,7 +30,7 @@ func main() {
 	workdir := flag.String("workdir", "osmviews-builder-workdir", "path to working directory")
 	showVersion := flag.Bool("version", false, "print version and exit")
 	zoomFilter := flag.Bool("zoom-filter", false,
-		"experimental: paint a second GeoTIFF with the zoom filter applied, "+
+		"paint both GeoTIFFs (regular and with the experimental zoom filter) "+
 			"to workdir only, and exit without publishing anything")
 	flag.Parse()
 	if *showVersion {
@@ -89,25 +89,34 @@ func main() {
 	localBomPath := filepath.Join(*workdir, fmt.Sprintf("osmviews-%s.cdx.json", date))
 	remoteBomPath := fmt.Sprintf("data/osmviews-%s.cdx.json", date)
 
-	// Experimental: paint with the zoom filter, for comparison with the
-	// regular output. Nothing gets uploaded; see zoomfilter.go.
+	filteredPath := filepath.Join(*workdir, fmt.Sprintf("osmviews-%s-filtered.tiff", date))
+	remoteFilteredPath := fmt.Sprintf("experimental/osmviews-%s-filtered.tiff", date)
+	filteredMeta := TiffMetadata{
+		Description: fmt.Sprintf(
+			"EXPERIMENTAL, zoom filter v%d against tile-log lanes. OpenStreetMap view density: "+
+				"ln(1 + weekly user views per km2) per pixel. Tile logs %s..%s. https://osmviews.toolforge.org",
+			zoomFilterVersion, logs.firstDay.Format("2006-01-02"), logs.lastDay.Format("2006-01-02")),
+		DateTime: logs.lastDay,
+	}
+	meta := TiffMetadata{
+		Description: fmt.Sprintf(
+			"OpenStreetMap view density: ln(1 + weekly user views per km2) "+
+				"per pixel. Tile logs %s..%s. https://osmviews.toolforge.org",
+			logs.firstDay.Format("2006-01-02"), logs.lastDay.Format("2006-01-02")),
+		DateTime: logs.lastDay,
+	}
+
+	// For comparison, paint both GeoTIFFs into workdir and stop there.
 	if *zoomFilter {
-		corrections, err := openZoomFilters(*workdir, logs.names, ctx)
+		corrections, err := openZoomFilters(*workdir, logs.names, nil, "", ctx)
 		if err != nil {
 			logger.Fatalf("computing zoom filter: %v", err)
 		}
-		path := filepath.Join(*workdir, fmt.Sprintf("osmviews-%s-zoomfilter.tiff", date))
-		meta := TiffMetadata{
-			Description: fmt.Sprintf(
-				"EXPERIMENTAL, zoom filter v%d. OpenStreetMap view density: "+
-					"ln(1 + weekly user views per km2) per pixel. Tile logs %s..%s.",
-				zoomFilterVersion, logs.firstDay.Format("2006-01-02"), logs.lastDay.Format("2006-01-02")),
-			DateTime: logs.lastDay,
+		outputs := []PaintOutput{{Path: localpath, Meta: meta}, {Path: filteredPath, Meta: filteredMeta, Filtered: true}}
+		if err := paint(outputs, maxZoom, logs.readers, logs.weights, corrections, ctx); err != nil {
+			logger.Fatalf("painting: %v", err)
 		}
-		if err := paint(path, maxZoom, logs.readers, logs.weights, corrections, meta, ctx); err != nil {
-			logger.Fatalf("painting %s: %v", path, err)
-		}
-		logger.Printf("painted %s; not publishing because of -zoom-filter", path)
+		logger.Printf("painted %s and %s; not publishing because of -zoom-filter", localpath, filteredPath)
 		return
 	}
 
@@ -122,24 +131,83 @@ func main() {
 			break
 		}
 	}
-	if published {
+	filteredPublished := false
+	if _, err := pub.Stat(ctx, pubBucket, remoteFilteredPath); err == nil {
+		filteredPublished = true
+	}
+	if published && filteredPublished {
 		logger.Printf("already published: %s/%s and siblings; nothing to do", pubBucket, remotepath)
 		return
 	}
 
-	// Paint the output GeoTIFF file. The description deliberately carries no
+	// The experimental zoom filter (zoomfilter.go) yields a second GeoTIFF,
+	// published outside the BOM and datapackage.json until it has been
+	// evaluated. Its corrections are cached per week in object storage. On
+	// a first run, computing them for a whole year would not fit into the
+	// job's time limit, so each run works on them for a limited time, and
+	// the filtered GeoTIFF is painted once all weeks are ready. Since the
+	// filter is experimental, its failures do not stop the regular output.
+	paintFiltered := false
+	if !filteredPublished {
+		ready, err := prepareZoomFilters(*workdir, logs.names, storage, bucket, 40*time.Minute, ctx)
+		switch {
+		case err != nil:
+			logger.Printf("zoom filter failed, painting without it: %v", err)
+		case !ready:
+			logger.Printf("zoom filter not ready for all weeks yet; continuing on the next run")
+		default:
+			paintFiltered = true
+		}
+	}
+	if published && !paintFiltered {
+		logger.Printf("already published: %s/%s and siblings; nothing to do", pubBucket, remotepath)
+		return
+	}
+
+	// Paint the output GeoTIFF files. The description deliberately carries no
 	// generation timestamp, so a rebuild of the same week is byte-identical
 	// and the BOM's recorded hashes stay valid.
-	meta := TiffMetadata{
-		Description: fmt.Sprintf(
-			"OpenStreetMap view density: ln(1 + weekly user views per km2) "+
-				"per pixel. Tile logs %s..%s. https://osmviews.toolforge.org",
-			logs.firstDay.Format("2006-01-02"), logs.lastDay.Format("2006-01-02")),
-		DateTime: logs.lastDay,
+	var outputs []PaintOutput
+	var corrections []io.Reader
+	if !published {
+		outputs = append(outputs, PaintOutput{Path: localpath, Meta: meta})
 	}
-	if err := paint(localpath, maxZoom, logs.readers, logs.weights, nil, meta, ctx); err != nil {
-		logger.Fatalf("painting %s: %v", localpath, err)
+	if paintFiltered {
+		corrections, err = openZoomFilters(*workdir, logs.names, storage, bucket, ctx)
+		if err != nil {
+			logger.Printf("zoom filter failed, painting without it: %v", err)
+			paintFiltered = false
+		} else {
+			outputs = append(outputs, PaintOutput{Path: filteredPath, Meta: filteredMeta, Filtered: true})
+		}
 	}
+	if len(outputs) == 0 {
+		logger.Printf("already published: %s/%s and siblings; nothing to do", pubBucket, remotepath)
+		return
+	}
+	if err := paint(outputs, maxZoom, logs.readers, logs.weights, corrections, ctx); err != nil {
+		logger.Fatalf("painting: %v", err)
+	}
+	if !published {
+		publishRegular(ctx, pub, pubBucket, logs, localpath, remotepath, localBomPath, remoteBomPath, *workdir)
+	}
+	if paintFiltered {
+		if err := pub.PutFile(ctx, pubBucket, remoteFilteredPath, filteredPath, "image/tiff"); err != nil {
+			logger.Fatalf("uploading %s/%s: %v", pubBucket, remoteFilteredPath, err)
+		}
+		logger.Printf("uploaded experimental %s/%s", pubBucket, remoteFilteredPath)
+	}
+
+	if err := Cleanup(storage, bucket, pub, pubBucket); err != nil {
+		logger.Fatalf("garbage-collecting old files in storage: %v", err)
+	}
+}
+
+// publishRegular builds the BOM and datapackage.json for the regular
+// GeoTIFF at localpath and uploads all three to the public bucket.
+func publishRegular(ctx context.Context, pub Storage, pubBucket string, logs *weeklyLogs,
+	localpath, remotepath, localBomPath, remoteBomPath, workdir string) {
+	logger := log.Default()
 
 	// Build the CycloneDX Bill of Materials for the GeoTIFF: the exact bytes
 	// (SHA-256/512) and the software revision that produced them. See bom.go
@@ -179,7 +247,7 @@ func main() {
 	if err != nil {
 		logger.Fatalf("stat %s: %v", localBomPath, err)
 	}
-	localDPPath := filepath.Join(*workdir, "datapackage.json")
+	localDPPath := filepath.Join(workdir, "datapackage.json")
 	if err := writeDatapackage(localDPPath, datapackageInputs{
 		Date:         logs.lastDay,
 		RasterPath:   filepath.Base(remotepath),
@@ -208,12 +276,8 @@ func main() {
 			logger.Fatalf("uploading %s/%s: %v", pubBucket, u.remote, err)
 		}
 	}
-	logger.Printf("uploaded %s/%s, %s/%s and %s/%s; done, %s",
+	logger.Printf("uploaded %s/%s, %s/%s and %s/%s; %s",
 		pubBucket, remoteBomPath, pubBucket, remotepath, pubBucket, remoteDPPath, memStats())
-
-	if err := Cleanup(storage, bucket, pub, pubBucket); err != nil {
-		logger.Fatalf("garbage-collecting old files in storage: %v", err)
-	}
 }
 
 // newHTTPClient returns the HTTP client used to fetch tile logs from

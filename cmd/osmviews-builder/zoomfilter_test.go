@@ -188,7 +188,7 @@ func TestTileCorrectionsRoundTrip(t *testing.T) {
 
 func readZoomFilters(t *testing.T, dir, name string) []TileCorrection {
 	t.Helper()
-	readers, err := openZoomFilters(dir, []string{name}, context.Background())
+	readers, err := openZoomFilters(dir, []string{name}, nil, "", context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -224,7 +224,7 @@ func TestOpenZoomFilters_Caches(t *testing.T) {
 	if len(got) != 0 {
 		t.Errorf("got %v, want no corrections", got)
 	}
-	cache := filepath.Join(dir, "zoomfilter-v1-2026-W40-3d.br")
+	cache := filepath.Join(dir, "zoomfilter-v2-2026-W40-3d.br")
 	if _, err := os.Stat(cache); err != nil {
 		t.Errorf("cache file not written: %v", err)
 	}
@@ -248,7 +248,7 @@ func TestOpenZoomFilters_Caches(t *testing.T) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 
-	if _, err := openZoomFilters(dir, []string{"tilelogs-missing.br"}, context.Background()); err == nil {
+	if _, err := openZoomFilters(dir, []string{"tilelogs-missing.br"}, nil, "", context.Background()); err == nil {
 		t.Error("want error for missing tile logs")
 	}
 }

@@ -143,34 +143,62 @@ func NewPainter(path string, numWeeks int, zoom uint8, meta TiffMetadata) (*Pain
 	}, nil
 }
 
-// Paint produces a GeoTIFF file from a set of weekly tile view counts.
+// PaintOutput is one GeoTIFF that paint produces.
+type PaintOutput struct {
+	Path     string
+	Meta     TiffMetadata // provenance written into the GeoTIFF's tags
+	Filtered bool         // paint the counts after corrections, not before
+}
+
+// paint produces GeoTIFF files from a set of weekly tile view counts.
 // Tile views at zoom level `zoom` become one pixel in the output GeoTIFF.
 // weights[i] scales the counts of tilecounts[i] so that a week with only
 // some of its seven days of logs is extrapolated to a full week; a nil
-// weights slice means a factor of 1.0 for every week. meta is provenance
-// written into the GeoTIFF's tags. corrections, if not nil, is parallel to
-// tilecounts and replaces the counts of some tiles (see mergeTileCounts).
-func paint(path string, zoom uint8, tilecounts []io.Reader, weights []float64, corrections []io.Reader, meta TiffMetadata, ctx context.Context) error {
+// weights slice means a factor of 1.0 for every week. corrections, if not
+// nil, is parallel to tilecounts and replaces the counts of some tiles
+// (see mergeTileCounts) for the outputs that are Filtered. All outputs are
+// painted in the same pass over the logs, which costs much less time than
+// painting them one after the other.
+func paint(outputs []PaintOutput, zoom uint8, tilecounts []io.Reader, weights []float64, corrections []io.Reader, ctx context.Context) error {
 	logger := log.Default()
-	logger.Printf("starting to paint GeoTIFF, path=%s, zoom=%d", path, zoom)
 	start := time.Now()
+	painters := make([]*Painter, len(outputs))
+	for i, o := range outputs {
+		logger.Printf("starting to paint GeoTIFF, path=%s, zoom=%d, filtered=%v", o.Path, zoom, o.Filtered)
+		p, err := NewPainter(o.Path, len(tilecounts), zoom, o.Meta)
+		if err != nil {
+			return err
+		}
+		painters[i] = p
+	}
 
 	// One goroutine is decompressing, parsing and merging the weekly counts;
-	// another is painting the image from data that gets sent over a channel.
-	ch := make(chan TileCount, 100000)
-	painter, err := NewPainter(path, len(tilecounts), zoom, meta)
-	if err != nil {
-		return err
-	}
+	// another is painting the images from data that gets sent over a channel.
+	ch := make(chan tileCountPair, 100000)
 	g, subCtx := errgroup.WithContext(ctx)
 	g.Go(func() error {
-		return mergeTileCounts(tilecounts, weights, corrections, ch, subCtx)
+		return mergeTileCountPairs(tilecounts, weights, corrections, ch, subCtx)
 	})
 	g.Go(func() error {
 		tile := WorldTile
-		counts := make([]uint64, len(tilecounts))
-		numCounts := 0 // number of counts for the same tile
+		counts := make([][]uint64, len(outputs))
+		numCounts := make([]int, len(outputs)) // number of counts for the same tile
+		for i := range counts {
+			counts[i] = make([]uint64, len(tilecounts))
+		}
 		painted := 0
+		flush := func() error {
+			for i, p := range painters {
+				if numCounts[i] > 0 {
+					if err := p.Paint(tile, counts[i][:numCounts[i]]); err != nil {
+						return err
+					}
+				}
+				numCounts[i] = 0
+			}
+			painted++
+			return nil
+		}
 		progress := time.NewTicker(30 * time.Second)
 		defer progress.Stop()
 		for {
@@ -181,34 +209,28 @@ func paint(path string, zoom uint8, tilecounts []io.Reader, weights []float64, c
 				logger.Printf("painting: %d tiles so far, %s elapsed, %s",
 					painted, time.Since(start).Round(time.Second), memStats())
 			case c, more := <-ch:
-				if c.Key != tile {
-					if numCounts > 0 {
-						if err := painter.Paint(tile, counts[:numCounts]); err != nil {
-							return err
-						}
-						painted++
+				if !more || c.Key != tile {
+					if err := flush(); err != nil {
+						return err
 					}
-					numCounts = 0
 					tile = c.Key
 				}
-
-				if c.Count > 0 {
-					if numCounts >= len(counts) {
-						return fmt.Errorf("tile %s appears more than %d times in input", tile.String(), len(counts))
-					}
-					counts[numCounts] = c.Count
-					numCounts = numCounts + 1
-				}
-
 				if !more {
-					if numCounts > 0 {
-						if err := painter.Paint(tile, counts[:numCounts]); err != nil {
-							return err
-						}
-						painted++
-					}
 					logger.Printf("painted %d tiles from weekly counts", painted)
 					return nil
+				}
+				for i, o := range outputs {
+					count := c.Raw
+					if o.Filtered {
+						count = c.Filtered
+					}
+					if count > 0 {
+						if numCounts[i] >= len(tilecounts) {
+							return fmt.Errorf("tile %s appears more than %d times in input", tile.String(), len(tilecounts))
+						}
+						counts[i][numCounts[i]] = count
+						numCounts[i]++
+					}
 				}
 			}
 		}
@@ -216,9 +238,12 @@ func paint(path string, zoom uint8, tilecounts []io.Reader, weights []float64, c
 	if err := g.Wait(); err != nil {
 		return err
 	}
-	if err := painter.Close(); err != nil {
-		return err
+	for i, p := range painters {
+		if err := p.Close(); err != nil {
+			return err
+		}
+		logger.Printf("finished painting %s", outputs[i].Path)
 	}
-	logger.Printf("finished painting %s in %s, %s", path, time.Since(start).Round(time.Second), memStats())
+	logger.Printf("finished painting in %s, %s", time.Since(start).Round(time.Second), memStats())
 	return nil
 }

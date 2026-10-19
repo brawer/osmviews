@@ -19,10 +19,30 @@ overviews — is written up in the
 
 ## Experimental zoom filter
 
-Some clients leave straight "lanes" of tile requests in the logs, often
-radiating from Null Island, on only one to three adjacent zoom levels. With
-`-zoom-filter`, the builder paints a second GeoTIFF,
-`<workdir>/osmviews-<date>-zoomfilter.tiff`, in which such single-zoom
-excesses are scaled down, and exits without publishing anything. The
-algorithm is described in [`zoomfilter.go`](zoomfilter.go). Each week's
-corrections are cached in the workdir as `zoomfilter-v<N>-<week>.br`.
+Some clients leave straight "lanes" of tile requests in the logs, mostly
+radiating from Null Island, and many map clients request tiles at Null
+Island itself when they start. The zoom filter removes both, in three steps:
+
+1. A cross-zoom check scales down areas where one zoom level far exceeds
+   its neighbouring zooms ([`zoomfilter.go`](zoomfilter.go)).
+2. A lane filter finds the lanes as straight lines in longitude/latitude
+   through Null Island, and cleans the faint traces the first step leaves
+   along them, except where they cross busy areas
+   ([`lanefilter.go`](lanefilter.go)).
+3. Tiles entirely within 3° of Null Island, which is open sea, are dropped.
+
+Every run paints a second GeoTIFF with the filter applied and uploads it
+to `experimental/osmviews-<date>-filtered.tiff` in the public bucket. It is
+not listed in the BOM or `datapackage.json` until it has been evaluated.
+Both GeoTIFFs are painted in the same pass over the tile logs.
+
+Each week's corrections are cached as `zoomfilter-v<N>-<week>.br`, in the
+workdir and in the internal bucket next to the weekly tile logs. A run
+spends at most 40 minutes computing missing ones; the filtered GeoTIFF is
+painted once all weeks are ready, so a first run with an empty cache spreads
+the work over several daily runs. Failures of the filter are logged and do
+not stop the regular output.
+
+With `-zoom-filter`, the builder paints both GeoTIFFs into the workdir,
+`osmviews-<date>.tiff` and `osmviews-<date>-filtered.tiff`, and exits
+without publishing anything.
