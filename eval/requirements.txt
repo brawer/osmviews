@@ -1,0 +1,4 @@
+# SPDX-FileCopyrightText: 2026 Sascha Brawer <sascha@brawer.ch>
+# SPDX-License-Identifier: MIT
+numpy==2.5.3
+pillow==12.3.0
