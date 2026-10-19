@@ -16,3 +16,13 @@ memory — the level-embedding tile key, the streaming per-period sort and
 cross-period merge, the constant-memory raster construction with inline
 overviews — is written up in the
 [defensive publication](https://raw.githubusercontent.com/brawer/osmviews/main/docs/defensive-publication/defensive-publication.pdf).
+
+## Experimental zoom filter
+
+Some clients leave straight "lanes" of tile requests in the logs, often
+radiating from Null Island, on only one to three adjacent zoom levels. With
+`-zoom-filter`, the builder paints a second GeoTIFF,
+`<workdir>/osmviews-<date>-zoomfilter.tiff`, in which such single-zoom
+excesses are scaled down, and exits without publishing anything. The
+algorithm is described in [`zoomfilter.go`](zoomfilter.go). Each week's
+corrections are cached in the workdir as `zoomfilter-v<N>-<week>.br`.

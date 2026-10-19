@@ -148,8 +148,9 @@ func NewPainter(path string, numWeeks int, zoom uint8, meta TiffMetadata) (*Pain
 // weights[i] scales the counts of tilecounts[i] so that a week with only
 // some of its seven days of logs is extrapolated to a full week; a nil
 // weights slice means a factor of 1.0 for every week. meta is provenance
-// written into the GeoTIFF's tags.
-func paint(path string, zoom uint8, tilecounts []io.Reader, weights []float64, meta TiffMetadata, ctx context.Context) error {
+// written into the GeoTIFF's tags. corrections, if not nil, is parallel to
+// tilecounts and replaces the counts of some tiles (see mergeTileCounts).
+func paint(path string, zoom uint8, tilecounts []io.Reader, weights []float64, corrections []io.Reader, meta TiffMetadata, ctx context.Context) error {
 	logger := log.Default()
 	logger.Printf("starting to paint GeoTIFF, path=%s, zoom=%d", path, zoom)
 	start := time.Now()
@@ -163,7 +164,7 @@ func paint(path string, zoom uint8, tilecounts []io.Reader, weights []float64, m
 	}
 	g, subCtx := errgroup.WithContext(ctx)
 	g.Go(func() error {
-		return mergeTileCounts(tilecounts, weights, ch, subCtx)
+		return mergeTileCounts(tilecounts, weights, corrections, ch, subCtx)
 	})
 	g.Go(func() error {
 		tile := WorldTile

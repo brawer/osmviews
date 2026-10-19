@@ -29,6 +29,9 @@ func main() {
 
 	workdir := flag.String("workdir", "osmviews-builder-workdir", "path to working directory")
 	showVersion := flag.Bool("version", false, "print version and exit")
+	zoomFilter := flag.Bool("zoom-filter", false,
+		"experimental: paint a second GeoTIFF with the zoom filter applied, "+
+			"to workdir only, and exit without publishing anything")
 	flag.Parse()
 	if *showVersion {
 		fmt.Println(SoftwareVersion)
@@ -86,6 +89,28 @@ func main() {
 	localBomPath := filepath.Join(*workdir, fmt.Sprintf("osmviews-%s.cdx.json", date))
 	remoteBomPath := fmt.Sprintf("data/osmviews-%s.cdx.json", date)
 
+	// Experimental: paint with the zoom filter, for comparison with the
+	// regular output. Nothing gets uploaded; see zoomfilter.go.
+	if *zoomFilter {
+		corrections, err := openZoomFilters(*workdir, logs.names, ctx)
+		if err != nil {
+			logger.Fatalf("computing zoom filter: %v", err)
+		}
+		path := filepath.Join(*workdir, fmt.Sprintf("osmviews-%s-zoomfilter.tiff", date))
+		meta := TiffMetadata{
+			Description: fmt.Sprintf(
+				"EXPERIMENTAL, zoom filter v%d. OpenStreetMap view density: "+
+					"ln(1 + weekly user views per km2) per pixel. Tile logs %s..%s.",
+				zoomFilterVersion, logs.firstDay.Format("2006-01-02"), logs.lastDay.Format("2006-01-02")),
+			DateTime: logs.lastDay,
+		}
+		if err := paint(path, maxZoom, logs.readers, logs.weights, corrections, meta, ctx); err != nil {
+			logger.Fatalf("painting %s: %v", path, err)
+		}
+		logger.Printf("painted %s; not publishing because of -zoom-filter", path)
+		return
+	}
+
 	// If every published object for this week is already in the public bucket,
 	// there is nothing to do. datapackage.json is written last, so requiring it
 	// too means a build interrupted mid-publish is retried on the next run (the
@@ -112,7 +137,7 @@ func main() {
 			logs.firstDay.Format("2006-01-02"), logs.lastDay.Format("2006-01-02")),
 		DateTime: logs.lastDay,
 	}
-	if err := paint(localpath, maxZoom, logs.readers, logs.weights, meta, ctx); err != nil {
+	if err := paint(localpath, maxZoom, logs.readers, logs.weights, nil, meta, ctx); err != nil {
 		logger.Fatalf("painting %s: %v", localpath, err)
 	}
 
@@ -228,6 +253,7 @@ func newHTTPClient() *http.Client {
 type weeklyLogs struct {
 	readers  []io.Reader // one per week, oldest first
 	weights  []float64   // parallel to readers: 7/NumDays for each week
+	names    []string    // parallel to readers: weekly log file names in workdir
 	lastWeek string      // ISO week of the most recent week, eg. "2021-W28"
 	firstDay time.Time   // earliest ingested daily log
 	lastDay  time.Time   // most recent ingested daily log
@@ -264,6 +290,7 @@ func fetchWeeklyLogs(workdir string, storage Storage, bucket string, maxWeeks in
 
 	readers := make([]io.Reader, 0, len(weeks))
 	weights := make([]float64, 0, len(weeks))
+	names := make([]string, 0, len(weeks))
 	for _, week := range weeks {
 		r, err := GetTileLogs(week.Week, week.NumDays, client, workdir, storage, bucket)
 		if err != nil {
@@ -271,12 +298,14 @@ func fetchWeeklyLogs(workdir string, storage Storage, bucket string, maxWeeks in
 		}
 		readers = append(readers, r)
 		weights = append(weights, 7.0/float64(week.NumDays))
+		names = append(names, weekLogName(week.Week, week.NumDays))
 	}
 	logger.Printf("all %d weeks ready, %s", len(weeks), memStats())
 
 	return &weeklyLogs{
 		readers:  readers,
 		weights:  weights,
+		names:    names,
 		lastWeek: weeks[len(weeks)-1].Week,
 		firstDay: weeks[0].FirstDay,
 		lastDay:  weeks[len(weeks)-1].LastDay,

@@ -70,7 +70,7 @@ func TestMergeTileCounts_Weights(t *testing.T) {
 	ch := make(chan TileCount, 1)
 	g, ctx := errgroup.WithContext(context.Background())
 	g.Go(func() error {
-		return mergeTileCounts(readers, []float64{1.0, 3.5}, ch, ctx)
+		return mergeTileCounts(readers, []float64{1.0, 3.5}, nil, ch, ctx)
 	})
 	g.Go(func() error {
 		for tc := range ch {
@@ -103,7 +103,7 @@ func readMerged(readers []io.Reader) ([]TileCount, error) {
 	ch := make(chan TileCount, 1)
 	g, ctx := errgroup.WithContext(context.Background())
 	g.Go(func() error {
-		return mergeTileCounts(readers, nil, ch, ctx)
+		return mergeTileCounts(readers, nil, nil, ch, ctx)
 	})
 	g.Go(func() error {
 		for t := range ch {

@@ -24,7 +24,7 @@ func TestPaint(t *testing.T) {
 	defer file.Close()
 	readers := []io.Reader{brotli.NewReader(file)}
 	path := filepath.Join(t.TempDir(), "zurich.tif")
-	if err := paint(path, 9, readers, nil, TiffMetadata{}, context.Background()); err != nil {
+	if err := paint(path, 9, readers, nil, nil, TiffMetadata{}, context.Background()); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -36,7 +36,7 @@ func TestPaint_Metadata(t *testing.T) {
 		Description: "OSMViews test. Tile logs 2026-01-05..2026-08-23.",
 		DateTime:    time.Date(2026, 8, 23, 0, 0, 0, 0, time.UTC),
 	}
-	if err := paint(path, 11, readers, nil, meta, context.Background()); err != nil {
+	if err := paint(path, 11, readers, nil, nil, meta, context.Background()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -60,7 +60,7 @@ func TestPaint_Metadata(t *testing.T) {
 func TestPaint_NoMetadata(t *testing.T) {
 	readers := []io.Reader{strings.NewReader("3/1/1 3\n")}
 	path := filepath.Join(t.TempDir(), "nometa.tif")
-	if err := paint(path, 11, readers, nil, TiffMetadata{}, context.Background()); err != nil {
+	if err := paint(path, 11, readers, nil, nil, TiffMetadata{}, context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	f, _ := os.Open(path)
@@ -85,7 +85,7 @@ func TestPaint_Histogram(t *testing.T) {
 	const zoom = 11 // pixel zoom; main image is 2^zoom pixels on a side
 	readers := []io.Reader{strings.NewReader("3/1/1 3\n18/137341/91897 1\n")}
 	path := filepath.Join(t.TempDir(), "hist.tif")
-	if err := paint(path, zoom, readers, nil, TiffMetadata{}, context.Background()); err != nil {
+	if err := paint(path, zoom, readers, nil, nil, TiffMetadata{}, context.Background()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -145,7 +145,7 @@ func TestPaint_Histogram(t *testing.T) {
 func TestPaint_ParentNotLogged(t *testing.T) {
 	readers := []io.Reader{strings.NewReader("3/1/1 3\n18/137341/91897 1\n")}
 	path := filepath.Join(t.TempDir(), "notlogged.tif")
-	if err := paint(path, 11, readers, nil, TiffMetadata{}, context.Background()); err != nil {
+	if err := paint(path, 11, readers, nil, nil, TiffMetadata{}, context.Background()); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -158,7 +158,7 @@ func TestPaint_TooManyCountsForSameTile(t *testing.T) {
 	}
 	path := filepath.Join(t.TempDir(), "toomanycounts.tif")
 	var got string
-	if err := paint(path, 16, readers, nil, TiffMetadata{}, context.Background()); err != nil {
+	if err := paint(path, 16, readers, nil, nil, TiffMetadata{}, context.Background()); err != nil {
 		got = err.Error()
 	}
 	want := "tile 7/39/87 appears more than 1 times in input"
