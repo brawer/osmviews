@@ -98,3 +98,80 @@ def lonlat(width, col, row):
     lon = (np.asarray(col) + 0.5) / width * 360 - 180
     lat = np.degrees(np.arctan(np.sinh(np.pi * (1 - 2 * (np.asarray(row) + 0.5) / width))))
     return lon, lat
+
+
+def sample(path, width, lon, lat):
+    """Returns the pixel values at points lon/lat on a level, as float32.
+
+    Decodes each tile that holds a point once, so it scales to millions of
+    points on a fine level that would not fit in memory as a whole.
+    """
+    lon, lat = np.asarray(lon, np.float64), np.asarray(lat, np.float64)
+    lat = np.clip(lat, -85.05112877, 85.05112877)
+    col = np.clip(((lon + 180) / 360 * width).astype(np.int64), 0, width - 1)
+    r = np.radians(lat)
+    row = (1 - np.log(np.tan(r) + 1 / np.cos(r)) / np.pi) / 2 * width
+    row = np.clip(row.astype(np.int64), 0, width - 1)
+    out = np.zeros(len(lon), np.float32)
+    with open(path, "rb") as f:
+        for tags in _ifds(f):
+            if tags[WIDTH][0] == width:
+                break
+        else:
+            raise ValueError(f"{path}: no level of width {width}")
+        tw = tags[TILE_WIDTH][0]
+        tile = (row // tw) * (width // tw) + col // tw
+        order = np.argsort(tile, kind="stable")
+        starts = np.flatnonzero(np.r_[True, tile[order][1:] != tile[order][:-1]])
+        ends = np.r_[starts[1:], len(order)]
+        for s, e in zip(starts, ends):
+            idx = order[s:e]
+            i = tile[idx[0]]
+            f.seek(tags[OFFSETS][i])
+            data = f.read(tags[COUNTS][i])
+            if not data:
+                continue
+            if tags[COMPRESSION][0] == 8:
+                data = zlib.decompress(data)
+            t = np.frombuffer(data, np.float32).reshape(tw, tw)
+            out[idx] = t[row[idx] % tw, col[idx] % tw]
+    return out
+
+
+def views(path, width):
+    """Returns weekly user views per pixel at a level, summed from the base.
+
+    Pixels of the base level hold ln(1 + views per km2); undoing the
+    logarithm and multiplying by each base pixel's ground area gives views,
+    which are then summed (not max-pooled) into pixels of the given width.
+    Reads the whole base level, so it takes a few minutes.
+    """
+    with open(path, "rb") as f:
+        base = max(_ifds(f), key=lambda t: t[WIDTH][0])
+        bw, tw = base[WIDTH][0], base[TILE_WIDTH][0]
+        if bw % width or (bw // width) > tw or tw % (bw // width):
+            raise ValueError(f"cannot sum {bw} pixels into {width}")
+        k = bw // width            # base pixels per output pixel
+        per_tile = tw // k         # output pixels per tile
+        n = bw // tw
+        rows = np.arange(bw, dtype=np.float64)
+        north = np.arctan(np.sinh(np.pi * (1 - 2 * rows / bw)))
+        south = np.arctan(np.sinh(np.pi * (1 - 2 * (rows + 1) / bw)))
+        area = (6371.0088 ** 2 * (2 * np.pi / bw) * (np.sin(north) - np.sin(south)))
+        area = area.astype(np.float32)
+        out = np.zeros((width, width), np.float64)
+        for i, (offset, count) in enumerate(zip(base[OFFSETS], base[COUNTS])):
+            if not count:
+                continue
+            f.seek(offset)
+            data = f.read(count)
+            if base[COMPRESSION][0] == 8:
+                data = zlib.decompress(data)
+            t = np.frombuffer(data, np.float32).reshape(tw, tw)
+            if not t.any():
+                continue
+            row, col = divmod(i, n)
+            v = np.expm1(t) * area[row * tw:(row + 1) * tw, None]
+            s = v.reshape(per_tile, k, per_tile, k).sum(axis=(1, 3))
+            out[row * per_tile:(row + 1) * per_tile, col * per_tile:(col + 1) * per_tile] = s
+    return out

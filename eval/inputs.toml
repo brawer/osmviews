@@ -6,15 +6,90 @@
 # does not match. An input whose url is still empty must be given as a local
 # file through the environment variable named in `env`, which also overrides
 # a pinned url for experiments.
+#
+# Several sources keep only recent files: osmviews.brawer.ch keeps the
+# three latest GeoTIFFs, dumps.wikimedia.org about five months of dumps,
+# and the World Bank and QRank URLs serve the latest data. The inputs are
+# therefore archived on Zenodo with the paper; use that archive once these
+# URLs stop matching their checksums.
 
 [osmviews]
 description = "Regular OSMViews GeoTIFF of the evaluated release"
-url = ""     # set once the release is published
-sha256 = ""
+url = "https://osmviews.brawer.ch/data/osmviews-20261011.tiff"
+sha256 = "c7766c9c81853400c308453e80326e427076d56211a160b71e32fcaf055b79dd"
 env = "OSMVIEWS_TIFF"
+
+[osmviews-previous-1]
+description = "Regular OSMViews GeoTIFF one week before the evaluated release"
+url = "https://osmviews.brawer.ch/data/osmviews-20261004.tiff"
+sha256 = "e9bbd71460e0022b057ef5702e79fc2fe96ff789fd550a5aaf86bb09e96405fe"
+env = "OSMVIEWS_PREVIOUS_1_TIFF"
+
+[osmviews-previous-2]
+description = "Regular OSMViews GeoTIFF two weeks before the evaluated release"
+url = "https://osmviews.brawer.ch/data/osmviews-20260927.tiff"
+sha256 = "33b72b42a228a4667a4cbd86b4a70889577b9c55ac3df14569b8acd4506885ff"
+env = "OSMVIEWS_PREVIOUS_2_TIFF"
 
 [osmviews-filtered]
 description = "Experimental OSMViews GeoTIFF with zoom filter v2 (lanes, Null Island)"
 url = ""     # data/experimental/osmviews-<date>-filtered.tiff of the same release
 sha256 = ""
 env = "OSMVIEWS_FILTERED_TIFF"
+optional = true  # evaluations of the filter are skipped without it
+
+[ghsl-pop]
+description = "GHS-POP R2023A, population for 2025 at 30 arc seconds (European Commission JRC, CC BY 4.0)"
+url = "https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/GHSL/GHS_POP_GLOBE_R2023A/GHS_POP_E2025_GLOBE_R2023A_4326_30ss/V1-0/GHS_POP_E2025_GLOBE_R2023A_4326_30ss_V1_0.zip"
+sha256 = "752626a5bbe6f9d0cf79ac33a3cac3572234952b98b5113a4cc01a6bd2d30383"
+env = "GHSL_POP_ZIP"
+
+[viirs-flux]
+description = "Annual night-light radiant flux 2024 from SNPP-VIIRS VNL, at 15 arc seconds (Zeng, Jia, Zhao; CC BY 4.0)"
+url = "https://zenodo.org/records/17847442/files/radiantflux2024.zip"
+sha256 = "28d034a2456a0e251403fb4abadf0131f5e34b8aba374a2b94431f64e6fc2f92"
+env = "VIIRS_FLUX_ZIP"
+
+[commons-geotags]
+description = "Coordinates of Wikimedia Commons files, dump of 2026-10-01 (CC0)"
+url = "https://dumps.wikimedia.org/commonswiki/20261001/commonswiki-20261001-geo_tags.sql.gz"
+sha256 = "5e3c6c448e8d867f73f816271b1a413cb2d83fe9a11f3611210acfa25b13d888"
+env = "COMMONS_GEOTAGS"
+
+[wikidata-geotags]
+description = "Coordinates of Wikidata items, dump of 2026-10-01 (CC0)"
+url = "https://dumps.wikimedia.org/wikidatawiki/20261001/wikidatawiki-20261001-geo_tags.sql.gz"
+sha256 = "b71f698140646e4d9cd429ebbdd66d7f8ac5b8b8f4261eddbae58b7bdd0f7155"
+env = "WIKIDATA_GEOTAGS"
+
+[wikidata-pages]
+description = "Wikidata page table, dump of 2026-10-01, to map page ids to Q-ids (CC0)"
+url = "https://dumps.wikimedia.org/wikidatawiki/20261001/wikidatawiki-20261001-page.sql.gz"
+sha256 = "be94a0f087782e4fbd757664e348a76c991eb57d7973d429f49854813307dab0"
+env = "WIKIDATA_PAGES"
+
+[qrank]
+description = "QRank of 2026-10-11 (CC0)"
+url = "https://qrank.toolforge.org/download/qrank-20261011.csv.gz"
+sha256 = "944676da0692e9f9fc03b201a3293401475729ef615aed45f9c8bff95f5437a2"
+env = "QRANK_CSV"
+
+[ne-countries]
+description = "Natural Earth 1:10m admin 0 countries, version 5.1.1 (public domain)"
+url = "https://naciscdn.org/naturalearth/10m/cultural/ne_10m_admin_0_countries.zip"
+sha256 = "ce1ac7036499a0edd641fbc093cd209a98f96a49d2eca8480aaacad35138a7f6"
+env = "NE_COUNTRIES_ZIP"
+
+[wb-internet]
+description = "World Bank WDI: individuals using the internet, percent of population (IT.NET.USER.ZS; CC BY 4.0)"
+url = "https://api.worldbank.org/v2/en/indicator/IT.NET.USER.ZS?downloadformat=csv"
+file = "IT.NET.USER.ZS.zip"
+sha256 = "0e9591d78c8a1a2a2979da49650b26aef9146fe9027e24a475f94ac14c356554"
+env = "WB_INTERNET_ZIP"
+
+[wb-population]
+description = "World Bank WDI: total population (SP.POP.TOTL; CC BY 4.0)"
+url = "https://api.worldbank.org/v2/en/indicator/SP.POP.TOTL?downloadformat=csv"
+file = "SP.POP.TOTL.zip"
+sha256 = "9c8a27460bb951b2b6e18fe9c01fac3938c78fd6b8862a84240d01f218b649b0"
+env = "WB_POPULATION_ZIP"

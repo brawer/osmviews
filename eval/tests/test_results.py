@@ -20,6 +20,13 @@ class ResultsTest(unittest.TestCase):
             self.assertIn(r"\newcommand{\resAgreementSpearman}{0.999}", text)
             self.assertEqual(json.loads(js.read_text())["agreement"]["pixels"], 1234567)
 
+    def test_write_nested(self):
+        with tempfile.TemporaryDirectory() as d:
+            tex, js = Path(d) / "r.tex", Path(d) / "r.json"
+            results.write({"external": {"byContinent": {"North America": {"ghsl": 0.5}}}}, tex, js)
+            self.assertIn(r"\newcommand{\resExternalByContinentNorthAmericaGhsl}{0.500}",
+                          tex.read_text())
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -27,14 +27,23 @@ def _format(v):
     return str(v)
 
 
+def _flatten(tree, prefix=""):
+    """Yields (key path, value) for the leaves of nested dicts, sorted."""
+    for key in sorted(tree):
+        value = tree[key]
+        path = f"{prefix} {key}".strip()
+        if isinstance(value, dict):
+            yield from _flatten(value, path)
+        else:
+            yield path, value
+
+
 def write(results, tex_path, json_path):
     with open(json_path, "w") as f:
         json.dump(results, f, indent=2, sort_keys=True)
         f.write("\n")
     lines = [HEADER]
-    for section in sorted(results):
-        for key in sorted(results[section]):
-            name = _name(f"{section} {key}")
-            lines.append(f"\\newcommand{{\\{name}}}{{{_format(results[section][key])}}}\n")
+    for key, value in _flatten(results):
+        lines.append(f"\\newcommand{{\\{_name(key)}}}{{{_format(value)}}}\n")
     with open(tex_path, "w") as f:
         f.writelines(lines)
