@@ -20,6 +20,14 @@ def sha256(path):
     return h.hexdigest()
 
 
+def entry(name):
+    """Returns the manifest entry of input `name`, with any env override."""
+    with open(MANIFEST, "rb") as f:
+        e = tomllib.load(f)[name]
+    e["url"] = os.environ.get(e["env"], "") or e["url"]
+    return e
+
+
 def resolve(name, cache):
     """Returns the local path of input `name`, downloading it if needed.
 

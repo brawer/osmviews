@@ -43,7 +43,7 @@ def _groups(index):
     return starts, index[starts]
 
 
-def maxpool_lonlat(path, width, per_area, strip=512):
+def maxpool_lonlat(path, width, per_area, strip=512, reduce=np.maximum):
     """Max-pools a raster in plain longitude/latitude onto a Mercator level.
 
     The source must be north-up in EPSG:4326, with cells much smaller than
@@ -51,6 +51,9 @@ def maxpool_lonlat(path, width, per_area, strip=512):
     as people) and is divided by the cell's ground area first, giving a
     density per km2; otherwise the value already is a density (such as
     radiance). Negative and non-finite values count as zero.
+
+    With reduce=np.add and per_area=False, it sums the cell values instead,
+    such as people per pixel.
     """
     out = np.zeros((width, width), np.float32)
     with rasterio.open(path) as src:
@@ -75,21 +78,35 @@ def maxpool_lonlat(path, width, per_area, strip=512):
                 data /= area[:, None].astype(np.float32)
             data, lat = data[inside], lat[inside]
             rows = np.clip(mercator_row(width, lat).astype(np.int64), 0, width - 1)
-            pooled = np.maximum.reduceat(data, col_starts, axis=1)
+            pooled = reduce.reduceat(data, col_starts, axis=1)
             row_starts, row_ids = _groups(rows)
-            pooled = np.maximum.reduceat(pooled, row_starts, axis=0)
+            pooled = reduce.reduceat(pooled, row_starts, axis=0)
             block = out[row_ids[:, None], col_ids[None, :]]
-            out[row_ids[:, None], col_ids[None, :]] = np.maximum(block, pooled)
+            out[row_ids[:, None], col_ids[None, :]] = reduce(block, pooled)
     return out
 
 
-def count_points(width, lon, lat, weights=None):
-    """Returns the number (or summed weight) of points per pixel per km2."""
+def _pixel_index(width, lon, lat):
+    """Returns the flat pixel index of each point, or -1 if off the map."""
     lon, lat = np.asarray(lon, np.float64), np.asarray(lat, np.float64)
     ok = np.isfinite(lon) & np.isfinite(lat) & (np.abs(lat) < MAX_LAT) & (np.abs(lon) <= 180)
-    cols = np.clip(mercator_col(width, lon[ok]).astype(np.int64), 0, width - 1)
-    rows = np.clip(mercator_row(width, lat[ok]).astype(np.int64), 0, width - 1)
-    w = None if weights is None else np.asarray(weights, np.float64)[ok]
-    counts = np.bincount(rows * width + cols, weights=w, minlength=width * width)
+    cols = np.clip(mercator_col(width, np.where(ok, lon, 0)).astype(np.int64), 0, width - 1)
+    rows = np.clip(mercator_row(width, np.where(ok, lat, 0)).astype(np.int64), 0, width - 1)
+    return np.where(ok, rows * width + cols, -1)
+
+
+def count_points(width, lon, lat, weights=None, chunk=1 << 24):
+    """Returns the number (or summed weight) of points per pixel per km2."""
+    counts = np.zeros(width * width)
+    for i in range(0, len(lon), chunk):
+        idx = _pixel_index(width, lon[i:i + chunk], lat[i:i + chunk])
+        ok = idx >= 0
+        w = None if weights is None else np.asarray(weights[i:i + chunk], np.float64)[ok]
+        counts += np.bincount(idx[ok], weights=w, minlength=width * width)
     counts = counts.reshape(width, width)
     return (counts / pixel_area_km2(width)[:, None]).astype(np.float32)
+
+
+def point_counts(width, lon, lat):
+    """Returns the number of points in each pixel of a level, as float32."""
+    return (count_points(width, lon, lat) * pixel_area_km2(width)[:, None]).astype(np.float32)

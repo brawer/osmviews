@@ -30,14 +30,21 @@ OSMVIEWS_TIFF=osmviews.tiff OSMVIEWS_FILTERED_TIFF=osmviews-filtered.tiff make
 |---|---|---|
 | `agreement.py` | Effect of the filter | Share of pixels the filter changes, rank correlation regular vs. filtered |
 | `figures.py` | Artifacts and their removal | Side-by-side crops of both GeoTIFFs |
-| `external.py` | Agreement with other data | Rank correlation with GHSL population, VIIRS night lights and Wikimedia Commons photo locations, overall and by continent |
-| `qrank.py` | Downstream use | Rank correlation of QRank with OSMViews at the coordinates of Wikidata items |
+| `ranking.py` | Ranking places | Ranking functions (`functions.py`) scored on sample sets (`samples.py`): share of tied points, Zipf exponent, Kendall's tau-b between every pair of functions (`agreement_stats.py`) |
+| `cities.py` | Ranking cities | Each function summed within 5 km of GeoNames cities, compared with their population |
+| `qrank.py` | Wikidata items and QRank | Rank correlation of QRank with OSMViews at the coordinates of Wikidata items |
+| `external.py` | Stability and coverage | Rank correlation with GHSL population, VIIRS night lights and Commons photo locations on 10 km pixels, by continent |
 | `stability.py` | Stability and coverage | Rank correlation and top-1% overlap between consecutive weekly releases |
 | `coverage.py` | Stability and coverage | Views per country compared with internet users (World Bank) |
 
 Helpers: `cog.py` reads the GeoTIFF, `grid.py` brings other rasters and
 points onto its pixels, `regions.py` rasterizes Natural Earth countries,
 `wikimedia.py` reads the Wikimedia SQL dumps.
+
+Overture places and iNaturalist observations are too large to keep: only
+their coordinates are read, part by part or as a stream, and cached as
+`points-*.npz`. They are pinned by release path and ETag rather than by
+checksum, so archive these cached files with the paper.
 
 The evaluations of the filter (`agreement.py`, `figures.py`) need the
 filtered GeoTIFF; without it they are skipped and their earlier results in
@@ -50,4 +57,7 @@ The overview levels of the GeoTIFF are max-pooled, so sums over them are not
 view counts; the evaluations compare ranks and densities. `cog.views` sums
 true view counts from the full-resolution level, which takes a few minutes.
 
-The inputs take about 7 GB in `cache/`; a full run takes about 20 minutes.
+The inputs and intermediate files take about 25 GB in `cache/`. The first
+run takes a few hours, mostly downloading and reading AllThePlaces,
+Overture and iNaturalist; later runs take about 20 minutes. A machine with
+16 GB of memory is enough.
