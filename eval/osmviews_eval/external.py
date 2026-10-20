@@ -15,7 +15,7 @@ from pathlib import Path
 
 import numpy as np
 
-from . import cog, grid, regions, wikimedia
+from . import cog, grid, wikimedia
 from .results import HEADER
 from .stats import weighted_spearman
 

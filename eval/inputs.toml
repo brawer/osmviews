@@ -93,3 +93,51 @@ url = "https://api.worldbank.org/v2/en/indicator/SP.POP.TOTL?downloadformat=csv"
 file = "SP.POP.TOTL.zip"
 sha256 = "9c8a27460bb951b2b6e18fe9c01fac3938c78fd6b8862a84240d01f218b649b0"
 env = "WB_POPULATION_ZIP"
+
+[alltheplaces]
+description = "AllThePlaces run of 2026-10-10, GeoJSON of every spider (CC0 and per-spider terms)"
+url = "https://alltheplaces-data.openaddresses.io/runs/2026-10-10-13-32-41/output.zip"
+file = "atp-2026-10-10-13-32-41.zip"
+sha256 = "174b0a4836f88185d5c7fbe96228814da61141e65c2330b522644dc56d8665d7"
+env = "ALLTHEPLACES_ZIP"
+
+[geonames-cities]
+description = "GeoNames cities with at least 15,000 inhabitants, as of 2026-10-20 (CC BY 4.0)"
+url = "https://download.geonames.org/export/dump/cities15000.zip"
+sha256 = "a839fd6af3d55e5d41d2e281d481b7c0887cc9f2bc536723708843ef01e70ea8"
+env = "GEONAMES_CITIES_ZIP"
+
+# The two inputs below are too large to download whole. Only the columns
+# needed are read, so they are pinned by release path or ETag instead of a
+# checksum, and resolve() is not used for them.
+
+[overture-places]
+description = "Overture Maps places, release 2026-09-23.1 (CDLA Permissive 2.0, Apache 2.0)"
+url = "https://overturemaps-us-west-2.s3.amazonaws.com/release/2026-09-23.1/theme=places/type=place"
+parts = [
+  "part-00000-417d568b-a25f-57b3-9e15-9876068be5d6-c000.zstd.parquet",
+  "part-00001-947ef15d-91bf-56dd-a6a3-aad846cc7a28-c000.zstd.parquet",
+  "part-00002-c0c1dd40-1cc6-5636-81da-0df43a88fa9d-c000.zstd.parquet",
+  "part-00003-d872971a-e957-5cc9-a661-27396e8592fc-c000.zstd.parquet",
+  "part-00004-4792ea94-09f0-5546-beb1-f50d71febd84-c000.zstd.parquet",
+  "part-00005-19ebf8b3-812f-5237-8867-7e5b47d1d6dd-c000.zstd.parquet",
+  "part-00006-4f05dab3-5982-5cee-9cd0-714856eac08e-c000.zstd.parquet",
+  "part-00007-61ac23fc-0af6-5d61-8c46-5776ba7e6bf0-c000.zstd.parquet",
+  "part-00008-7a297224-4f30-5864-bfad-ebbcb6047b29-c000.zstd.parquet",
+  "part-00009-3f7e01dc-2fb9-50a7-8be5-65df80c1cdd4-c000.zstd.parquet",
+  "part-00010-1c7c0e0e-408b-5c7c-8dc8-a1687f22ef6e-c000.zstd.parquet",
+  "part-00011-9aa07e3a-309b-5031-8820-4ec743a80d43-c000.zstd.parquet",
+  "part-00012-5e6c496a-f443-52b4-bc5e-0b71af05ae54-c000.zstd.parquet",
+  "part-00013-87182afd-1282-5a98-b777-73886b671c42-c000.zstd.parquet",
+  "part-00014-1d36203b-4312-5a97-b9e0-5c110ae7a274-c000.zstd.parquet",
+  "part-00015-b21e3943-1706-5729-88ab-f4f5777eaae4-c000.zstd.parquet",
+]
+sha256 = ""
+env = "OVERTURE_PLACES_URL"
+
+[inaturalist]
+description = "iNaturalist open-data observations, as of 2026-09-27 (CC0, CC BY, CC BY-NC)"
+url = "https://inaturalist-open-data.s3.amazonaws.com/observations.csv.gz"
+etag = "\"441dd5c5c2ad2fd74b6dd0bdc0c6150e-26\""
+sha256 = ""
+env = "INATURALIST_URL"
