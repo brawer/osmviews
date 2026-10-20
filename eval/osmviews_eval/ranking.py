@@ -27,6 +27,7 @@ FUNCTION_NAMES = {
     "items": "Wikidata",
     "places": "Places",
     "observations": "Nature",
+    "nominatim": "Nominatim",
     "random": "Random",
 }
 

@@ -14,7 +14,8 @@ from pathlib import Path
 import numpy as np
 
 from . import (agreement, cities, cog, coverage, external, figures, functions,
-               inputs, qrank, ranking, regions, results, samples, stability)
+               inputs, nominatim, qrank, ranking, regions, results, samples,
+               stability)
 
 GHSL_TIF = "GHS_POP_E2025_GLOBE_R2023A_4326_30ss_V1_0.tif"
 VIIRS_TIF = "radiantflux2024.tif"
@@ -79,6 +80,9 @@ def _ranking(cache, regular, countries, out):
     for name, load in sources.items():
         fns[{"commons": "photos", "wikidata": "items"}.get(name, name)] = (
             lambda load=load: functions.PointDensity(*load()))
+    secondary = nominatim.secondary_tiff(
+        cache, inputs.resolve("nominatim-secondary-importance", cache))
+    fns["nominatim"] = lambda: functions.LonLatRaster(secondary, per_area=False)
     fns["random"] = functions.Random
     scores = ranking.score(sets, fns, Path(cache) / f"scores-{Path(regular).stem}.npz")
     res = ranking.run(scores, out)
@@ -140,6 +144,15 @@ def main(cache, out):
         qrank_csv=inputs.resolve("qrank", cache),
     )
     res["qrank"] = qrank.run(rasters, *items)
+    qid, qr, lat, lon = items
+    res["nominatim"] = nominatim.run(
+        qid, qr, lon, lat,
+        nominatim.importance(inputs.resolve("nominatim-importance", cache)),
+        functions.OSMViews(regular),
+        functions.LonLatRaster(nominatim.secondary_tiff(
+            cache, inputs.resolve("nominatim-secondary-importance", cache)),
+            per_area=False),
+        out)
 
     res["ranking"] = _ranking(cache, regular, countries, out)
 
