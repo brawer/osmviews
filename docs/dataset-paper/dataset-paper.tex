@@ -339,6 +339,21 @@ divided by the pixel's area. When a point is scored by the density of its
 own source, such as a Wikidata item by the density of Wikidata items, it is
 left out of its own count. A uniformly random score serves as a baseline.
 
+OSMViews is not the first attempt to rank places by map views.
+Nominatim, the geocoder of OpenStreetMap, ranks search results mainly by
+the importance of a place's Wikipedia article and breaks ties with a
+\enquote{secondary importance} raster looked up at the place's centroid.
+From version~4.2 to~4.4, the raster distributed with Nominatim was
+\enquote{based on the number of tile views on openstreetmap.org}
+\cite{nominatim}. It has since been replaced by one derived from the
+Wikipedia importance of administrative areas, at zoom~14; according to
+its documentation, one problem with tile views had been small websites
+that embed a map on their home page and so make a region look more
+popular than it is~\cite{secondaryimportance}. OSMViews works at zoom~18
+and aggregates a year of logs per tile with a robust
+statistic~(\S\ref{sec:construction}), but embedded maps still count as
+views~(\S\ref{sec:usage}).
+
 \begin{table}[t]
   \centering\small
   \caption{Ranking functions. Cell sizes are at the equator.}
@@ -403,8 +418,12 @@ ties~\cite{kendall}; it is the probability that the two put a random pair
 of points in the same order, minus the probability that they put it in the
 opposite order. Spearman's rank correlation and the overlap of the top
 1\,\% are in the generated results. For the skew of a function, we fit
-$\text{score} \propto \text{rank}^{-s}$ over the positive scores, from rank
-10 to the 90th percentile of ranks; $s$ near 1 is Zipf's law.
+a power law $p(x) \propto x^{-\alpha}$ to the upper tail of its scores by
+maximum likelihood, choosing the lower bound of the tail that minimises the
+Kolmogorov--Smirnov distance, and test it against a lognormal fitted to the
+same tail by the normalised likelihood ratio~\cite{clauset,vuong}. In a
+power-law tail, scores fall off with rank as $\text{rank}^{-s}$ with
+$s = 1/(\alpha - 1)$; $s$ near 1 is Zipf's law.
 
 \subsection{How the functions behave}
 OSMViews gives a score above zero to almost every point of every sample
@@ -423,13 +442,18 @@ a street needs a finer function. Population and night lights are smooth,
 so they rarely tie in towns, but they also cannot tell a shopping street
 from the residential block next to it.
 
-OSMViews is also among the most skewed functions. Fitted over the ATP
-brands, its scores fall off as $\text{rank}^{-s}$ with
-$s = \resRankingBrandsOsmviewsZipf$, close to the density of photos
-(\resRankingBrandsPhotosZipf) and steeper than population
-(\resRankingBrandsPopulationZipf) or the density of places
-(\resRankingBrandsPlacesZipf): a few places are viewed far more than the
-rest.
+All functions are heavy-tailed, but none follows Zipf's law. Of the
+\resRankingTailsFits{} tails fitted (seven functions on ten sample sets), a
+lognormal describes \resRankingTailsLognormal{} significantly better than
+a power law ($p < 0.1$), and a power law only \resRankingTailsPowerLaw.
+Over the ATP brands, the top \resRankingBrandsOsmviewsPowerLawTailPct\,\%
+of OSMViews scores fit a power law with $\alpha =
+\resRankingBrandsOsmviewsPowerLawAlpha$ ($s = \resRankingBrandsOsmviewsZipf$),
+but a lognormal fits as well (normalised log-likelihood ratio
+$\resRankingBrandsOsmviewsPowerLawLognormalR$, $p =
+\resRankingBrandsOsmviewsPowerLawLognormalP$). Exponents fitted by
+least squares on a log-log plot, as is common, would have suggested
+otherwise~\cite{clauset}.
 
 \subsection{How much the functions agree}
 Agreement with OSMViews ranges from $\tau_b$ around 0.1 to 0.7
@@ -527,7 +551,17 @@ reviewed proposals is in.}
 \section{Usage notes and limitations}\label{sec:usage}
 \todo{What the values mean and do not mean; bias toward users of the
 standard tile servers; no individual data; overview levels are maxima, so
-sums over them are not view counts.}
+sums over them are not view counts; maps embedded in other websites count
+as views; the public logs omit tiles requested fewer than 10 times, or from fewer than 3
+distinct addresses, on a day.}
+
+All agreement measures in this paper depend only on the order of values,
+so they would not change if values were replaced by their percentiles.
+Percentiles are still useful for combining OSMViews with other data or
+comparing releases, since they do not shift when total traffic changes;
+they can be read off the histogram embedded in the GeoTIFF, but depend on
+the reference set (all pixels or land, weighted by area or not).
+\todo{Decide whether to publish a per-release table of percentiles.}
 
 %========================================================================
 \section{Code availability}\label{sec:code}
@@ -572,6 +606,17 @@ paper. \todo{Archive inputs and outputs on Zenodo and cite the DOI.}
   as of 2026-10-20. \url{https://www.geonames.org/}
 \bibitem{kendall} M.~G.~Kendall, \enquote{The treatment of ties in ranking
   problems,} Biometrika 33(3):239--251, 1945.
+\bibitem{nominatim} Nominatim, \enquote{Importance,} documentation of
+  versions 4.2.0 to 4.4.0, file \code{docs/customize/Importance.md}.
+  \url{https://github.com/osm-search/Nominatim/blob/v4.4.0/docs/customize/Importance.md}
+\bibitem{secondaryimportance} osm-search, \enquote{Secondary importance
+  processing.} \url{https://github.com/osm-search/secondary-importance}
+\bibitem{clauset} A.~Clauset, C.~R.~Shalizi, M.~E.~J.~Newman,
+  \enquote{Power-law distributions in empirical data,} SIAM Review
+  51(4):661--703, 2009. \url{https://doi.org/10.1137/070710111}
+\bibitem{vuong} Q.~H.~Vuong, \enquote{Likelihood ratio tests for model
+  selection and non-nested hypotheses,} Econometrica 57(2):307--333, 1989.
+  \url{https://doi.org/10.2307/1912557}
 \end{thebibliography}
 
 \end{document}
