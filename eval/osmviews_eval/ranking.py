@@ -107,7 +107,23 @@ def run(scores, out_dir):
     _write_agreement(res, out_dir / "ranking-agreement.tex")
     _write_ties(res, out_dir / "ranking-ties.tex")
     _write_matrix(res[MATRIX_SET], out_dir / "ranking-matrix.tex")
+    res["tails"] = _tails(res)
     return res
+
+
+def _tails(res, p=0.1):
+    """Counts the fits whose tail is better described by a power law or a
+    lognormal, at significance p, over all non-random functions and sets."""
+    out = {"fits": 0, "powerLaw": 0, "lognormal": 0}
+    for r in res.values():
+        for f, d in r.items():
+            fit = d.get("powerLaw") if isinstance(d, dict) and f != "random" else None
+            if not fit:
+                continue
+            out["fits"] += 1
+            if fit["lognormalP"] < p:
+                out["powerLaw" if fit["lognormalR"] > 0 else "lognormal"] += 1
+    return out
 
 
 def _fmt(x, digits=2):

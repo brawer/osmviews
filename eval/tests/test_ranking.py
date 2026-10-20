@@ -29,11 +29,27 @@ class AgreementStatsTest(unittest.TestCase):
         self.assertLess(agreement_stats.top_overlap(a, b), 0.05)
 
     def test_describe(self):
-        x = 1000.0 / np.arange(1, 1001) ** 1.5
-        d = agreement_stats.describe(np.r_[x, 0, 0])
-        self.assertAlmostEqual(d["zipf"], 1.5, places=6)
+        x = np.r_[np.arange(1.0, 1001), 0, 0]
+        d = agreement_stats.describe(x)
         self.assertAlmostEqual(d["zeroPct"], 200 / 1002)
         self.assertAlmostEqual(d["tiedPct"], 200 / 1002)
+
+    def test_power_law(self):
+        rng = np.random.default_rng(1)
+        pareto = (1 - rng.random(20000)) ** (-1 / 1.5)  # alpha = 2.5
+        fit = agreement_stats.power_law(pareto)
+        self.assertAlmostEqual(fit["alpha"], 2.5, delta=0.05)
+        self.assertGreater(fit["tailPct"], 50)
+        self.assertAlmostEqual(agreement_stats.describe(pareto)["zipf"],
+                               1 / (fit["alpha"] - 1))
+
+    def test_power_law_prefers_lognormal(self):
+        x = np.random.default_rng(2).lognormal(0, 1, 50000)
+        fit = agreement_stats.power_law(x, candidates=10)
+        self.assertLess(fit["lognormalR"], 0)
+
+    def test_power_law_too_few(self):
+        self.assertIsNone(agreement_stats.power_law(np.zeros(1000)))
 
 
 class PointDensityTest(unittest.TestCase):
