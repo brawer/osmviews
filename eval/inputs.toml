@@ -141,3 +141,15 @@ url = "https://inaturalist-open-data.s3.amazonaws.com/observations.csv.gz"
 etag = "\"441dd5c5c2ad2fd74b6dd0bdc0c6150e-26\""
 sha256 = ""
 env = "INATURALIST_URL"
+
+[nominatim-importance]
+description = "Nominatim primary importance of Wikidata items, from Wikipedia, as of 2025-11-27 (nominatim.org)"
+url = "https://nominatim.org/data/wikimedia-importance.csv.gz"
+sha256 = "5b776b8d413b94293f91433cf302ff4d74ce266fafea9b9842581cb4e8c4f2de"
+env = "NOMINATIM_IMPORTANCE_CSV"
+
+[nominatim-secondary-importance]
+description = "Nominatim secondary importance raster, from Wikipedia importance of areas, as of 2024-05-04 (nominatim.org)"
+url = "https://nominatim.org/data/wikimedia-secondary-importance.sql.gz"
+sha256 = "4f8c02c063d668ee59196421a3bf3b33d4930da27405bff2839fbd401da83559"
+env = "NOMINATIM_SECONDARY_IMPORTANCE_SQL"

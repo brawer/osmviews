@@ -345,14 +345,17 @@ the importance of a place's Wikipedia article and breaks ties with a
 \enquote{secondary importance} raster looked up at the place's centroid.
 From version~4.2 to~4.4, the raster distributed with Nominatim was
 \enquote{based on the number of tile views on openstreetmap.org}
-\cite{nominatim}. It has since been replaced by one derived from the
-Wikipedia importance of administrative areas, at zoom~14; according to
-its documentation, one problem with tile views had been small websites
-that embed a map on their home page and so make a region look more
-popular than it is~\cite{secondaryimportance}. OSMViews works at zoom~18
-and aggregates a year of logs per tile with a robust
-statistic~(\S\ref{sec:construction}), but embedded maps still count as
-views~(\S\ref{sec:usage}).
+\cite{nominatim}. Its maintainers found tile loads \enquote{not granular
+enough}~\cite{nominatimblog}, and small websites that embed a map on their
+home page made regions look more popular than they
+are~\cite{secondaryimportance}. Since version~4.5, the raster holds, for
+cells of 0.022 by 0.011 degrees (about 2.4 by 1.2\,km at the equator), the
+highest Wikipedia-based importance of any area covering the cell, usually
+an administrative boundary. We include this raster as the ranking
+function \emph{Nominatim}: it scores how well-known the surrounding area
+is. OSMViews works at zoom~18 and aggregates a year of logs per tile with
+a robust statistic~(\S\ref{sec:construction}), but embedded maps still
+count as views~(\S\ref{sec:usage}).
 
 \begin{table}[t]
   \centering\small
@@ -369,6 +372,7 @@ views~(\S\ref{sec:usage}).
     Wikidata & Wikidata items & 600\,m \\
     Places & Overture places~\cite{overture} & 600\,m \\
     Nature & iNaturalist observations~\cite{inaturalist} & 600\,m \\
+    Nominatim & importance of the area~\cite{nominatim} & 2.4\,km \\
     Random & --- & --- \\
     \hline
   \end{tabular}
@@ -440,10 +444,12 @@ points share a pixel, which is why OSMViews ties
 \resRankingTreesOsmviewsTiedPct\,\% of ATP trees; a finer ranking within
 a street needs a finer function. Population and night lights are smooth,
 so they rarely tie in towns, but they also cannot tell a shopping street
-from the residential block next to it.
+from the residential block next to it. Nominatim's area raster is the
+extreme case: it ties \resRankingBrandsNominatimTiedPct\,\% of ATP brands,
+since all places in the same town share the importance of that town.
 
 All functions are heavy-tailed, but none follows Zipf's law. Of the
-\resRankingTailsFits{} tails fitted (seven functions on ten sample sets), a
+\resRankingTailsFits{} tails fitted (eight functions on ten sample sets), a
 lognormal describes \resRankingTailsLognormal{} significantly better than
 a power law ($p < 0.1$), and a power law only \resRankingTailsPowerLaw.
 Over the ATP brands, the top \resRankingBrandsOsmviewsPowerLawTailPct\,\%
@@ -468,13 +474,16 @@ that set is street lamps. On ATP brands, population agrees best
 
 These values are moderate, but the other functions agree no better with
 each other (Table~\ref{tab:matrix}). On ATP brands, the mean $\tau_b$ of
-OSMViews with the other six functions is
+OSMViews with the other seven functions is
 \resRankingBrandsOsmviewsKendallMean, against
 \resRankingBrandsPopulationKendallMean{} for population,
 \resRankingBrandsLightsKendallMean{} for night lights and
 \resRankingBrandsPlacesKendallMean{} for places; only photos and Wikidata
 items, both from Wikimedia projects, agree more strongly with each other
-(\resRankingBrandsPhotosKendallItems). OSMViews thus sits near the middle of
+(\resRankingBrandsPhotosKendallItems). Nominatim's area raster, built
+from Wikipedia alone, agrees with OSMViews about as well as population
+does (\resRankingBrandsNominatimKendallOsmviews{} on ATP brands), but
+with the point densities much less. OSMViews thus sits near the middle of
 the other measures: no other function agrees as much with all the rest,
 and none duplicates it.
 \todo{Interpret further once the filtered raster is in: do the lanes lower
@@ -520,6 +529,27 @@ the rank correlation between QRank and OSMViews at the item's location is
 lie on pixels with views. A famous thing can sit in a quiet place and a
 little-known one on a busy square, so a weak correlation is expected; the
 two signals complement each other.
+
+Nominatim's primary importance also ranks Wikidata items by Wikipedia
+(\S\ref{sec:ranking}). On \resNominatimItems{} of these items, drawn at
+random, it agrees with QRank at $\tau_b = \resNominatimQrankImportance$
+(Table~\ref{tab:nominatim}), but only \resNominatimWithImportancePct\,\%
+of the items have an importance in Nominatim's file; the rest have no
+Wikipedia article and tie at zero. OSMViews agrees with both weakly
+(\resNominatimQrankOsmviews{} and \resNominatimImportanceOsmviews), but
+well with Nominatim's area raster read at the item
+(\resNominatimOsmviewsSecondary). Breaking ties with OSMViews instead of the area raster
+would keep much of the order between areas and add an order within them.
+
+\begin{table}[t]
+  \centering\small
+  \caption{Agreement (Kendall's $\tau_b$) between rankings of
+    \resNominatimItems{} Wikidata items with coordinates: QRank, Nominatim's
+    primary importance, OSMViews at the item, and Nominatim's area
+    raster at the item (Area).}
+  \label{tab:nominatim}
+  \input{generated/nominatim-items.tex}
+\end{table}
 \todo{OSMDiffs: whether OSMViews helps rank edit proposals, once the list of
 reviewed proposals is in.}
 
@@ -609,6 +639,9 @@ paper. \todo{Archive inputs and outputs on Zenodo and cite the DOI.}
 \bibitem{nominatim} Nominatim, \enquote{Importance,} documentation of
   versions 4.2.0 to 4.4.0, file \code{docs/customize/Importance.md}.
   \url{https://github.com/osm-search/Nominatim/blob/v4.4.0/docs/customize/Importance.md}
+\bibitem{nominatimblog} M.~Tobias, \enquote{New Wikimedia-based scoring
+  file available,} Nominatim blog, 7~August 2024.
+  \url{https://nominatim.org/2024/08/07/wikimedia-file.html}
 \bibitem{secondaryimportance} osm-search, \enquote{Secondary importance
   processing.} \url{https://github.com/osm-search/secondary-importance}
 \bibitem{clauset} A.~Clauset, C.~R.~Shalizi, M.~E.~J.~Newman,

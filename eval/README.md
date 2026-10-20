@@ -31,6 +31,7 @@ OSMVIEWS_TIFF=osmviews.tiff OSMVIEWS_FILTERED_TIFF=osmviews-filtered.tiff make
 | `agreement.py` | Effect of the filter | Share of pixels the filter changes, rank correlation regular vs. filtered |
 | `figures.py` | Artifacts and their removal | Side-by-side crops of both GeoTIFFs |
 | `ranking.py` | Ranking places | Ranking functions (`functions.py`) scored on sample sets (`samples.py`): share of tied points, Zipf exponent, Kendall's tau-b between every pair of functions (`agreement_stats.py`) |
+| `nominatim.py` | Ranking functions; Wikidata items and QRank | Nominatim's area importance raster as a ranking function, and its primary importance of Wikidata items compared with QRank and OSMViews |
 | `cities.py` | Ranking cities | Each function summed within 5 km of GeoNames cities, compared with their population |
 | `qrank.py` | Wikidata items and QRank | Rank correlation of QRank with OSMViews at the coordinates of Wikidata items |
 | `external.py` | Stability and coverage | Rank correlation with GHSL population, VIIRS night lights and Commons photo locations on 10 km pixels, by continent |
