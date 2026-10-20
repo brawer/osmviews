@@ -555,6 +555,14 @@ sums over them are not view counts; maps embedded in other websites count
 as views; the public logs omit tiles requested fewer than 10 times, or from fewer than 3
 distinct addresses, on a day.}
 
+All agreement measures in this paper depend only on the order of values,
+so they would not change if values were replaced by their percentiles.
+Percentiles are still useful for combining OSMViews with other data or
+comparing releases, since they do not shift when total traffic changes;
+they can be read off the histogram embedded in the GeoTIFF, but depend on
+the reference set (all pixels or land, weighted by area or not).
+\todo{Decide whether to publish a per-release table of percentiles.}
+
 %========================================================================
 \section{Code availability}\label{sec:code}
 The builder, the artifact filter and this paper's evaluation are in
