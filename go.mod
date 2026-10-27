@@ -5,7 +5,7 @@ module github.com/brawer/osmviews/v2
 
 go 1.26.3
 
-toolchain go1.27.2
+toolchain go1.27.3
 
 // +heroku install ./cmd/osmviews-builder ./cmd/webserver
 
