@@ -13,6 +13,13 @@ Conventional Commit history. Versioning follows
 the **minor** version may be breaking — see
 [RELEASING.md](RELEASING.md#choosing-the-version-number).
 
+## [0.3.9](https://github.com/brawer/osmviews/compare/v0.3.8...v0.3.9) (2026-10-27)
+
+
+### 🐞 Fixes
+
+* build with Go 1.27.3 to fix GO-2026-6809 in crypto/x509 ([#170](https://github.com/brawer/osmviews/issues/170)) ([2cc974f](https://github.com/brawer/osmviews/commit/2cc974fc28c52f71d3eb51863b20317ef9a7c78e))
+
 ## [0.3.8](https://github.com/brawer/osmviews/compare/v0.3.7...v0.3.8) (2026-10-19)
 
 
