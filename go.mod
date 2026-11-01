@@ -10,14 +10,14 @@ toolchain go1.27.3
 // +heroku install ./cmd/osmviews-builder ./cmd/webserver
 
 require (
-	github.com/andybalholm/brotli v1.2.6
+	github.com/andybalholm/brotli v1.2.7
 	github.com/google/uuid v1.6.0
 	github.com/lanrat/extsort v1.5.0
-	github.com/minio/minio-go/v7 v7.3.0
+	github.com/minio/minio-go/v7 v7.4.1
 	github.com/orcaman/writerseeker v0.0.0-20200621085525-1d3f536ff85e
-	github.com/prometheus/client_golang v1.24.1
+	github.com/prometheus/client_golang v1.25.0
 	github.com/ulikunitz/xz v0.5.17
-	golang.org/x/sync v0.23.0
+	golang.org/x/sync v0.24.0
 )
 
 require (
