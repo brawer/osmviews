@@ -13,6 +13,13 @@ Conventional Commit history. Versioning follows
 the **minor** version may be breaking — see
 [RELEASING.md](RELEASING.md#choosing-the-version-number).
 
+## [0.3.10](https://github.com/brawer/osmviews/compare/v0.3.9...v0.3.10) (2026-11-16)
+
+
+### 🐞 Fixes
+
+* build with Go 1.27.4 to fix GO-2026-6859 in net/http ([#174](https://github.com/brawer/osmviews/issues/174)) ([9918c61](https://github.com/brawer/osmviews/commit/9918c611652eef1b3052614545b9e823d2d3cd72))
+
 ## [0.3.9](https://github.com/brawer/osmviews/compare/v0.3.8...v0.3.9) (2026-10-27)
 
 
